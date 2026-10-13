@@ -1,5 +1,5 @@
 /*
- * Entity render transform (overlay 0, 0x020A3928-0x020A4214).
+ * Entity render transform (overlay 0, 0x020A3928-0x020A411C).
  *
  * The rotation and scaling applied to an entity's render object: starting a
  * timed rotation, advancing the transform and deciding when it has arrived.
@@ -19,34 +19,7 @@ static inline void AddScale(FieldRenderObject *renderer, s16 x, s16 y)
     renderer->scale_y = old_y + y;
 }
 extern "C" int FieldRotation_StartTimed(FieldRuntimeEntity *entity, int relative, u32 angle, int duration,
-                                        int direction, u8 snap, FieldTransformController *controller)
-{
-    int old_angle = entity->render_object->rotation;
-    int destination, distance;
-    if (!controller)
-        controller = &entity->transform_controller;
-    if (!relative) {
-        destination = angle & 0xFFFF;
-        distance = direction > 0 ? destination - old_angle : old_angle - destination;
-        if (distance < 0)
-            distance += 0x10000;
-        distance += angle & 0xFFFF0000;
-    } else {
-        distance = angle;
-        destination = (old_angle + angle * direction) & 0xFFFF;
-    }
-    controller->bits.rotation_active = 1;
-    controller->bits.rotation_paused = 0;
-    controller->bits.rotation_fixed_duration = 1;
-    controller->rotation_elapsed = 0;
-    controller->start_rotation = old_angle;
-    controller->destination_rotation = destination;
-    controller->rotation_duration = duration;
-    controller->bits.stop_rotation_at_destination = snap;
-    controller->rotation_step = (distance * direction) / duration;
-    controller->remaining_rotation = distance;
-    return 1;
-}
+                                        int direction, u8 snap, FieldTransformController *controller);
 extern "C" void FieldRotation_Stop(FieldRuntimeEntity *entity, FieldTransformController *controller, int snap)
 {
     if (!controller)

@@ -57,6 +57,9 @@ src/title_ov006/frontend_scene_irq.c:
 src/title_ov006/credits_motion.c:
     .text start:0x02077b5c end:0x02077ce8
 
+src/title_ov006/credits_motion_step.c:
+    .text start:0x02077ce8 end:0x02077d5c
+
 src/title_ov006/credits_resources.c:
     .text start:0x0207a1dc end:0x0207a788
 
@@ -77,6 +80,9 @@ src/title_ov006/title_orbit.c:
 
 src/title_ov006/title_panel.c:
     .text start:0x0206db4c end:0x0206e594
+
+src/title_ov006/func_ov006_0206e594.c:
+    .text start:0x0206e594 end:0x0206e644
 
 src/title_ov006/title_moving_sprite.c:
     .text start:0x0206e644 end:0x0206e9e4
@@ -143,3 +149,7 @@ src/title_ov006/credits_particles.c:
 
 src/title_ov006/credits_texture_upload.c:
     .text start:0x02078990 end:0x020789f4
+
+
+src/title_ov006/func_ov006_02073e6c.c:
+    .text start:0x02073e6c end:0x02073f20

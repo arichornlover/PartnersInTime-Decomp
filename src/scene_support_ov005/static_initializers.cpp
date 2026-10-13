@@ -1,4 +1,4 @@
-/* Scene pool and registry initialization, overlay 5, 0x02069D6C-0x02069EB8. */
+/* Scene pool and registry initialization, overlay 5. Split into individual initializers. */
 #include <game/overlay005_pools.h>
 #include <msl/object_register.h>
 extern "C" {
