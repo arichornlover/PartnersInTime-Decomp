@@ -993,6 +993,11 @@ src/attack_bro_flower_ov014/participant_update.cpp
 src/attack_bro_flower_ov014/participant_prepare.cpp
 src/attack_bro_flower_ov014/projectile_update.cpp
 src/scene_support_ov005/static_initializers.cpp
+src/scene_support_ov005/func_ov005_02065f10.c
+src/scene_support_ov005/func_ov005_02066128.c
+src/scene_support_ov005/func_ov005_02066920.c
+src/scene_support_ov005/func_ov005_02068908.c
+src/scene_support_ov005/func_ov005_0206937c.c
 src/attack_smash_egg_ov015/actor_finish.cpp
 src/attack_smash_egg_ov015/pair_hit.cpp
 src/attack_smash_egg_ov015/smash_eggs_sequence.cpp

@@ -7,14 +7,23 @@
 src/scene_support_ov005/element_lists.c:
     .text start:0x02066224 end:0x02066920
 
+src/scene_support_ov005/func_ov005_02066920.c:
+    .text start:0x02066920 end:0x02066a7c
+
 src/scene_support_ov005/touch_panel.c:
     .text start:0x020686cc end:0x02068908
+
+src/scene_support_ov005/func_ov005_02068908.c:
+    .text start:0x02068908 end:0x02068b20
 
 src/scene_support_ov005/sprite_pool.cpp:
     .text start:0x02068b20 end:0x02068ee0
 
 src/scene_support_ov005/draw_lists.cpp:
     .text start:0x02068ee0 end:0x0206937c
+
+src/scene_support_ov005/func_ov005_0206937c.c:
+    .text start:0x0206937c end:0x020695cc
 
 src/scene_support_ov005/item_pool.c:
     .text start:0x020695cc end:0x020699f0
@@ -33,6 +42,12 @@ src/scene_support_ov005/touch_state.c:
 
 src/scene_support_ov005/scene_system.cpp:
     .text start:0x02065d40 end:0x02065f10
+
+src/scene_support_ov005/func_ov005_02065f10.c:
+    .text start:0x02065f10 end:0x02066128
+
+src/scene_support_ov005/func_ov005_02066128.c:
+    .text start:0x02066128 end:0x02066224
 
 src/scene_support_ov005/archive_assets.c:
     .text start:0x02066a7c end:0x02067638
