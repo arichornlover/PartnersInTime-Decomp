@@ -56,40 +56,10 @@ def main() -> None:
     for source_file in source_files:
         if source_file.suffix not in {".c", ".cpp", ".s"}:
             raise ValueError(f"Unsupported linked source file: {source_file}")
-        
+        if not source_file.is_file():
+            raise FileNotFoundError(f"Linked source file does not exist: {source_file}")
         compiled_object = args.build_root / object_path(source_file)
         reference_object = args.delinks_root / object_path(source_file)
-        
-        # Check if source file exists; if not, look for pre-built object
-        if not source_file.is_file():
-            prebuilt_object = args.build_root / object_path(source_file)
-            if prebuilt_object.is_file():
-                compiled_object = prebuilt_object
-            else:
-                # Also check the analysis directory for pre-built objects
-                prebuilt_analysis = Path("build/analysis/emit") / f"{source_file.stem}.o"
-                if prebuilt_analysis.is_file():
-                    compiled_object.parent.mkdir(parents=True, exist_ok=True)
-                    import shutil
-                    shutil.copy2(prebuilt_analysis, compiled_object)
-                    print(f"DEBUG: Copied {prebuilt_analysis} to {compiled_object}")
-                    compiled_object = compiled_object
-                else:
-                    raise FileNotFoundError(f"Linked source file does not exist and no pre-built object found: {source_file}")
-        elif not compiled_object.is_file():
-            # Source exists but compiled object doesn't exist yet (will be built later)
-            pass
-        
-        # If we have a pre-built object in the analysis directory, copy it to the build directory
-        prebuilt_analysis = Path("build/analysis/emit") / f"{source_file.stem}.o"
-        print(f"DEBUG: prebuilt_analysis = {prebuilt_analysis}, exists = {prebuilt_analysis.is_file()}")
-        if prebuilt_analysis.is_file():
-            compiled_object.parent.mkdir(parents=True, exist_ok=True)
-            import shutil
-            shutil.copy2(prebuilt_analysis, compiled_object)
-            print(f"DEBUG: Copied {prebuilt_analysis} to {compiled_object}")
-            compiled_object = compiled_object
-        
         replacements[normalized(reference_object)] = compiled_object
 
     output_lines = []

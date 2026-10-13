@@ -135,10 +135,10 @@ src/field/field_auxiliary_updates.cpp:
     .text start:0x020b6560 end:0x020b6e98
 
 src/field/field_render_transform.cpp:
-    .text start:0x020a3928 end:0x020a411c
+    .text start:0x020a3928 end:0x020a412c
 
-src/field/func_ov000_020a411c.s:
-    .text start:0x020a411c end:0x020a4214
+src/field/func_ov000_020a412c.s:
+    .text start:0x020a412c end:0x020a4214
 
 src/field/field_area_state.c:
     .text start:0x0206e4d8 end:0x0206ec68

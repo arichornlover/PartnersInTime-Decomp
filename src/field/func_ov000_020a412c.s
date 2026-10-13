@@ -1,7 +1,6 @@
 /*
- * FieldRotation_StartTimed (ov000, 0x020A411C-0x020A4214).
+ * FieldRotation_StartTimed (ov000, 0x020A412C-0x020A4214).
  * Starts a timed rotation transform on a field entity.
- * Includes conditional early exit (NE condition) at entry.
  */
 
         .section .text
@@ -9,21 +8,9 @@
         .align 2
 
         .extern _s32_div_f
-
         .global FieldRotation_StartTimed
-FieldRotation_StartTimed:
-        /* Conditional early exit (NE condition) - 0x020A411C */
-        /* if Z flag clear (NE): load and store, then return */
-        ldrne   r1, [r1, #0x24]
-        ldrne   r0, [r0, #0x1E0]
-        /* MWCC doesn't support strhne, use branch around */
-        bne     early_exit_store
-        bx      lr
-early_exit_store:
-        strh    r1, [r0, #0x78]
-        bx      lr
 
-        /* Main function body - 0x020A412C */
+FieldRotation_StartTimed:
         stmdb   sp!, {r4, r5, r6, r7, lr}
         sub     sp, sp, #4
         ldr     r5, [sp, #0x20]
@@ -32,9 +19,8 @@ early_exit_store:
         addeq   r5, r0, #0x280
         ldrh    lr, [r4, #0x78]
         cmp     r1, #0
-        bne     loc_020A4184_
+        bne     loc_020A4184
 
-        /* ldr r0, [pc, #0xB8] -> loads 0xFFFF0000 from pool at offset 0xF4 */
         ldr     r0, [pc, #0xB8]
         ldr     r1, [sp, #0x18]
         and     ip, r2, r0
@@ -47,15 +33,16 @@ early_exit_store:
         addlt   r4, r4, #0x10000
         and     r0, r2, r0
         add     r4, r4, r0
-        b       loc_020A4198_
+        b       loc_020A4198
 
-loc_020A4184_:
+loc_020A4184:
         ldr     r1, [sp, #0x18]
-        /* ldr r0, [pc, #0x80] -> loads 0xFFFF0000 from pool at offset 0xF4 */
         ldr     r0, [pc, #0x80]
         mla     r1, r2, r1, lr
         mov     r4, r2
         and     ip, r1, r0
+
+loc_020A4198:
         ldrh    r2, [r5]
         ldr     r0, [sp, #0x18]
         ldrb    r1, [sp, #0x1C]
@@ -80,18 +67,14 @@ loc_020A4184_:
         orr     r2, r3, r2, lsl #7
         strh    r2, [r5]
 
-loc_020A4198_:
-        /* Call _s32_div_f via literal pool */
-        ldr     ip, [pc, #0x18]
-        blx     ip
+        bl      _s32_div_f
 
         str     r0, [r5, #0x10]
         str     r4, [r5, #0x14]
         mov     r0, #1
         add     sp, sp, #4
-        ldmia   sp!, {r4, r5, r6, r7, pc}
+        ldmia   sp!, {r4, r5, r6, r7, lr}
+        bx      lr
 
-        /* Literal pool */
-        .word   0x0000FFFF          /* 0xFFFF0000 for and operations */
-        .word   _s32_div_f          /* Address of _s32_div_f */
+        .word   0x0000FFFF
         .align 2

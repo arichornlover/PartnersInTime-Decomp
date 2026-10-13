@@ -1,5 +1,5 @@
 /*
- * Entity render transform (overlay 0, 0x020A3928-0x020A411C).
+ * Entity render transform (overlay 0, 0x020A3928-0x020A412C).
  *
  * The rotation and scaling applied to an entity's render object: starting a
  * timed rotation, advancing the transform and deciding when it has arrived.
