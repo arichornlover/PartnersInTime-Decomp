@@ -2299,11 +2299,12 @@ int pit_patcher_ui_main(int argc, char **argv)
                 handle_text_input(event.text.text);
                 break;
             case SDL_MOUSEMOTION: {
-                int w = 1, h = 1;
-
-                SDL_GetRendererOutputSize(app.renderer, &w, &h);
-                mouse_x = event.motion.x * UI_W / (w ? w : 1);
-                mouse_y = event.motion.y * UI_H / (h ? h : 1);
+                /* SDL_RenderSetLogicalSize already delivers mouse events in the
+                 * logical 480x320 space, so take the event coordinates as-is.
+                 * Scaling them by the renderer output size a second time would
+                 * confine the pointer to a fraction of the window. */
+                mouse_x = event.motion.x;
+                mouse_y = event.motion.y;
                 handle_mouse_motion(mouse_x, mouse_y);
                 break;
             }
@@ -2311,6 +2312,8 @@ int pit_patcher_ui_main(int argc, char **argv)
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     int field = FOCUS_NONE;
 
+                    mouse_x = event.button.x;
+                    mouse_y = event.button.y;
                     handle_mouse_motion(mouse_x, mouse_y);
                     if (app.tab == TAB_PATCH && field_hit(mouse_x, mouse_y, &field)) {
                         set_focus(field);
@@ -2337,6 +2340,8 @@ int pit_patcher_ui_main(int argc, char **argv)
                 break;
             case SDL_MOUSEBUTTONUP:
                 if (event.button.button == SDL_BUTTON_LEFT) {
+                    mouse_x = event.button.x;
+                    mouse_y = event.button.y;
                     handle_mouse_motion(mouse_x, mouse_y);
                     for (i = 0; i < app.button_count; i++) {
                         if (app.buttons[i].pressed && app.buttons[i].hovered) {
