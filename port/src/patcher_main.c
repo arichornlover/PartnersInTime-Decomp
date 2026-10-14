@@ -4,7 +4,7 @@
  * The SDL front end and the Android app call exactly the same
  * pit_patcher_run, so this binary exists to exercise the pipeline without a
  * window: it is what the packaging script and the round-trip test use to prove
- * that the plan still produces the expected bytes.
+ * that a mod profile still produces the expected bytes.
  */
 
 #include <stdio.h>
@@ -47,7 +47,7 @@ static void usage(const char *argv0)
             "\n"
             "Mods are discovered from <mods-dir>/<id>/profile.json, default\n"
             "\"mods\". --list-mods prints what was found; --mod <id> applies\n"
-            "that profile instead of the built-in one.\n",
+            "that profile instead of the default hard_mode mod.\n",
             argv0, "hard_mode");
 }
 
@@ -147,6 +147,15 @@ int main(int argc, char **argv)
     input = argv[1];
     output = argv[2];
 
+    /*
+     * Applying with no explicit --mod keeps the shipped default: the hard_mode
+     * mod beside the launcher. It is an ordinary profile now, so a missing copy
+     * is a normal "not found" error rather than a silent built-in.
+     */
+    if (apply_plan && !mod_id) {
+        mod_id = "hard_mode";
+    }
+
     if (mod_id) {
         pit_mod_catalog catalog;
         char error[256];
@@ -187,7 +196,7 @@ int main(int argc, char **argv)
     if (result == PIT_PATCH_OK) {
         printf("plan applied    : %s\n", apply_plan ? "yes" : "no");
         printf("mod profile     : %s\n",
-               selected ? selected->name : "built-in hard_mode");
+               selected ? selected->name : "(none)");
         printf("records patched : %u\n", info.records_patched);
         printf("fields written  : %u\n", info.fields_written);
         printf("target offset   : 0x%08X\n", info.target_offset);

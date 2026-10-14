@@ -123,15 +123,17 @@ a probe of `sound_data.sdat`, and a manifest — next to the copy. The source RO
 is never modified.
 
 The launcher has four tabs — **HOME**, **MODS**, **SETTINGS** and **ABOUT** —
-and **MODS** lists
-the mods that may be applied, **none by default**. Its first two rows are always
-`NO MOD` and the built-in Hard Mode plan; every folder under `mods/` holding a
-loadable `profile.json` is listed after them. With no mod selected, the launcher
-verifies the user's own EUR cartridge and prepares the copy without a mod; the
-output is suffixed `.prepared.nds`. With a mod selected, the 98 stat records are
-scaled and the output carries that mod's own suffix, `.hardmode.nds` for the
-built-in plan. The prepared copies are named differently so they cannot be
-mistaken for each other.
+and **MODS** lists the mods that may be applied, **none by default**. Its first
+row is always `NO MOD`; every folder under `mods/` holding a loadable
+`profile.json` is listed after it. There is no built-in row: the launcher
+generates the `mods/` folder beside the executable and seeds it with the
+`hard_mode` profile, so Hard Mode is an ordinary mod read by the same loader as
+any other. With no mod selected, the launcher verifies the user's own EUR
+cartridge and prepares the copy without a mod; the output is suffixed
+`.prepared.nds`. With a mod selected, the 98 stat records are scaled and the
+output carries that mod's own suffix, `.hard_mode.nds` for the shipped profile.
+The prepared copies are named differently so they cannot be mistaken for each
+other.
 
 The C core and the Android app read profiles under the same rules, because the loader decides
 what a profile does to the ROM. An `id` over 32 characters is refused, since it
@@ -142,14 +144,14 @@ is truncated, since those are only ever shown on one clipped line. A disabled
 transform is kept and displayed rather than dropped, and skipped when patching,
 so a field an author tuned and then switched off stays visible.
 
-### One plan, two languages
+### One target file, two languages
 
 The Windows build is C/SDL2 and the Android build is pure Java. Rather than
 hand-copying constants, both compile against data generated from one
-authoritative plan:
+authoritative target file:
 
 ```
-tools/patch_sources/hard_mode_plan.json   constants only
+tools/patch_sources/patch_target.json      ROM identity, record layout, fields
 tools/patch_sources/font8x8.txt           original 8x8 font
         |
         v  tools/gen_patchplan.py
@@ -157,10 +159,12 @@ tools/patch_sources/font8x8.txt           original 8x8 font
         +--> android/.../PatchData.java
 ```
 
-`gen_patchplan.py --check` fails if either generated file is stale. The plan
-holds no retail data: an expected hash, a NitroFS path, a record stride, the
-field offsets recovered from `BattleEnemyStatRecord`, and multipliers. Every stat
-value is read from the user's own ROM at patch time.
+`gen_patchplan.py --check` fails if either generated file is stale. The target
+file holds no retail data: the supported cartridge's identity, the stat record's
+path, size and count, the field offsets recovered from `BattleEnemyStatRecord`,
+and the glyph table. It carries no multipliers, plan name or version — those live
+only in `mods/<id>/profile.json`. Every stat value is read from the user's own
+ROM at patch time.
 
 ### Rounding is exact, never floating point
 
@@ -195,8 +199,7 @@ Current results, against the supported EUR cartridge:
 | C output vs. Java output, mod on | byte-identical |
 | C output vs. Java output, mod off (prepare-only) | byte-identical |
 | Profile loading, seven fixtures incl. limits | both readers load or refuse each one identically |
-| Java unit tests | 1073 checks, 0 failed |
-| Java unit tests | 1081 checks, 0 failed |
+| Java unit tests | 1059 checks, 0 failed |
 | Launcher frames | each tab rendered headlessly to BMP and checked on every Windows build |
 
 The last one matters more than it looks. `pit_launcher.exe --hidden --frames N
@@ -214,7 +217,7 @@ not a playable build.
 
 The Android app is plain Java against the platform APIs: no SDL, no NDK, no
 Gradle. `Patcher.java`, `NitroFs.java` and `Sha1.java` have no `android.*`
-dependency at all, which is what makes them testable on a desktop JVM — 1081
+dependency at all, which is what makes them testable on a desktop JVM — 1059
 class-path checks run without a device. `MainActivity` adds Storage Access
 Framework file access and a worker thread; the app declares no storage
 permission, so it only ever touches the two documents the user picked.

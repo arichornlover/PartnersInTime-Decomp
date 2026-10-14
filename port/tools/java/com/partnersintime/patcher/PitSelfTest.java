@@ -61,6 +61,10 @@ public final class PitSelfTest {
             System.exit(2);
         }
 
+        if (applyPlan && modId == null) {
+            modId = "hard_mode";
+        }
+
         ModProfile profile = null;
         if (modId != null) {
             ModProfile.Catalog catalog = ModProfile.Catalog.scan(new java.io.File(modsDir));
@@ -107,7 +111,8 @@ public final class PitSelfTest {
         System.out.println("sha1        : " + result.inputSha1);
         System.out.println("plan applied: " + applyPlan);
         System.out.println("mod profile : "
-                + (profile == null ? "built-in " + PatchData.PLAN_ID : profile.id));
+                + (profile == null ? "none (ROM passed through unchanged)"
+                        : profile.name + " (" + profile.id + ")"));
         if (result.targetOffset != 0 || result.targetSize != 0) {
             System.out.printf("target      : id %d at 0x%08X, %d bytes%n",
                     result.targetId, result.targetOffset, result.targetSize);

@@ -8,10 +8,6 @@ public final class PatchData {
     private PatchData() {
     }
 
-    public static final String PLAN_ID = "hard_mode";
-    public static final String PLAN_NAME = "HARD MODE";
-    public static final String PLAN_VERSION = "1.0.0";
-
     public static final String ROM_SHA1 = "ba4ec2f99b4f2e0047601552bccf00aa73e28701";
     public static final String ROM_TITLE = "MARIO&LUIGI2";
     public static final String ROM_GAME_CODE = "ARMP";
@@ -42,50 +38,6 @@ public final class PatchData {
 
     public static final int[] FIELD_OFFSETS = {
         6, 8, 10, 12, 32, 34,
-    };
-
-    public static final int[] TRANSFORM_FIELD = {
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-    };
-
-    public static final int[] TRANSFORM_NUM = {
-        11, 2, 21, 5, 7, 7,
-    };
-
-    public static final int[] TRANSFORM_DEN = {
-        10, 1, 20, 4, 4, 4,
-    };
-
-    public static final int[] TRANSFORM_MIN = {
-        1, 0, 1, 1, 0, 0,
-    };
-
-    public static final int[] TRANSFORM_MAX = {
-        65535, 65535, 65535, 65535, 65535, 65535,
-    };
-
-    public static final String[] TRANSFORM_LABEL = {
-        "ENEMY HP",
-        "ENEMY POW",
-        "ENEMY DEF",
-        "ENEMY SPD",
-        "EXPERIENCE",
-        "COINS",
-    };
-
-    /* Display form of TRANSFORM_NUM/TRANSFORM_DEN, e.g. "x11/10". */
-    public static final String[] TRANSFORM_SCALE = {
-        "x11/10",
-        "x2",
-        "x21/20",
-        "x5/4",
-        "x7/4",
-        "x7/4",
     };
 
     public static final int FONT_FIRST = 32;

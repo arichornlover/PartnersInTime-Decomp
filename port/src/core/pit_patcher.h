@@ -9,7 +9,7 @@
  *
  * Progress is reported through a callback so the SDL front end and the command
  * line can show the same steps. The Android build implements the identical
- * sequence against the generated plan data.
+ * sequence against the same generated target data and its own mod profiles.
  */
 
 #ifndef PIT_CORE_PIT_PATCHER_H
@@ -30,10 +30,10 @@ typedef enum {
     PIT_PATCH_ERR_TARGET,        /* NitroFS target not found */
     PIT_PATCH_ERR_TARGET_SIZE,   /* target is not record_count * record_size */
     PIT_PATCH_ERR_WRITE,         /* could not write the output ROM */
-    PIT_PATCH_ERR_PLAN           /* no enabled transform in the plan */
+    PIT_PATCH_ERR_PLAN           /* the selected mod has no enabled transform */
 } pit_patch_result;
 
-/* Number of steps pit_patcher_run reports, for a progress bar. */
+/* Number of steps pit_patcher_run_ex reports, for a progress bar. */
 #define PIT_PATCH_STEPS 9
 
 typedef struct {
@@ -56,27 +56,19 @@ typedef void (*pit_patch_log_fn)(void *ctx, int step, const char *message,
 const char *pit_patch_result_text(pit_patch_result result);
 
 /*
- * Runs the full pipeline. Verifies the input, copies it, applies the plan to the
- * copy (unless apply_plan is zero), recomputes the header CRC and writes
- * output_path. On failure nothing is written and the reason is reported through
- * the log.
+ * Runs the full pipeline. Verifies the input, copies it, applies the selected
+ * mod profile to the copy (unless apply_plan is zero), recomputes the header CRC
+ * and writes output_path. On failure nothing is written and the reason is
+ * reported through the log.
  *
  * With apply_plan == 0 the copy is written untouched apart from the repaired
- * header CRC, so the tool doubles as a plain "prepare my own ROM" step and a
- * data mod, and the mods stay optional.
- */
-pit_patch_result pit_patcher_run(const char *input_path, const char *output_path,
-                                 int apply_plan, pit_patch_log_fn log,
-                                 void *ctx, pit_patch_info *info);
-
-/*
- * The same pipeline with an explicit mod profile. A NULL profile means the
- * built-in plan, which is what pit_patcher_run passes, so the shipped default
- * path is unchanged and still produces the same bytes.
+ * header CRC, so the tool doubles as a plain "prepare my own ROM" step; the
+ * profile is ignored. With apply_plan set the profile is required, and applying
+ * a NULL profile or one whose transforms all resolve to nothing is refused.
  *
- * Only the transform set differs between the two. Record layout, the field
- * offsets and the scaling rule all stay owned by the launcher, so a profile can
- * choose multipliers but cannot write outside the stat record.
+ * The profile owns only the multipliers. The record layout, the field table and
+ * the exact half-up rounding all stay fixed by the launcher, so a mod can choose
+ * multipliers but cannot write outside the stat record.
  */
 pit_patch_result pit_patcher_run_ex(const char *input_path,
                                     const char *output_path, int apply_plan,

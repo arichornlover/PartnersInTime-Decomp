@@ -17,8 +17,8 @@ namespace ui {
 struct Config {
     std::string source_rom;   /* last chosen source cartridge */
     std::string output_rom;   /* last chosen prepared copy */
-    std::string mods_dir;     /* folder scanned for mod profiles */
-    std::string mod_id;       /* "", "hard_mode", or a discovered profile id */
+    std::string mods_dir;     /* folder scanned for mod profiles; empty = mods beside the launcher */
+    std::string mod_id;       /* "", or a discovered profile id such as "hard_mode" */
     bool  export_assets;      /* run the generated-data export after preparing */
     bool  vsync;              /* swap interval */
     bool  show_log;           /* show the log panel on the HOME view */

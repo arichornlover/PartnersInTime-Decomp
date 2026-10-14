@@ -129,21 +129,18 @@ public final class Patcher {
     /**
      * Runs the full pipeline over the user's ROM bytes and returns the patched
      * image. The caller writes {@code out} so this stays off the main thread
-     * and works with any storage the platform hands back. When {@code applyPlan}
-     * is false the ROM is verified and copied with only the header CRC repaired,
-     * matching the C {@code --no-mods} path, so the data mod stays optional.
-     */
-    public static Result run(byte[] rom, byte[] out, boolean applyPlan, Listener listener) {
-        return run(rom, out, applyPlan, null, listener);
-    }
-
-    /**
-     * Runs the pipeline applying {@code profile} instead of the built-in plan.
-     * A null profile selects the built-in Hard Mode table, so the shipped path is
-     * unchanged. Transform names are resolved against PatchData.FIELD_NAMES at
-     * apply time: a profile that names a field the launcher does not own simply
-     * skips that transform, and a profile with no usable transform is refused
-     * rather than writing a copy that only looks patched.
+     * and works with any storage the platform hands back.
+     *
+     * <p>{@code profile} owns only the multipliers; the record layout, the field
+     * table and the exact half-up rounding are fixed here, so a mod cannot write
+     * outside the stat record. Transform names are resolved against
+     * {@link ModProfile#fieldIndex} at apply time: a profile that names a field
+     * the launcher does not have simply skips that transform. When
+     * {@code applyPlan} is false the ROM is verified and copied with only the
+     * header CRC repaired (the C {@code --no-mods} path) and the profile is
+     * ignored; with it true a missing profile, or one whose transforms all
+     * resolve to nothing, is refused rather than writing a copy that only looks
+     * patched.
      */
     public static Result run(byte[] rom, byte[] out, boolean applyPlan,
                              ModProfile profile, Listener listener) {
@@ -220,57 +217,49 @@ public final class Patcher {
                 PatchData.RECORD_SIZE), 0.58);
 
         /*
-         * Sized for the largest profile the reader accepts rather than for the
-         * built-in table, so resolving one cannot run out of room and silently
-         * drop the tail. In practice at most six can resolve: the reader refuses
-         * a repeated field and only six fields are known.
+         * Sized for the largest profile the reader accepts so resolving one
+         * cannot run out of room and silently drop the tail. In practice at most
+         * six can resolve: the reader refuses a repeated field and only six
+         * fields are known.
          */
-        int capacity = profile == null ? PatchData.TRANSFORM_NUM.length
-                : ModProfile.MAX_TRANSFORMS;
+        int capacity = ModProfile.MAX_TRANSFORMS;
         int[] fieldOf = new int[capacity];
         long[] numOf = new long[capacity];
         long[] denOf = new long[capacity];
         int[] minOf = new int[capacity];
         int[] maxOf = new int[capacity];
-        int planCount = PatchData.TRANSFORM_NUM.length;
+        int planCount = 0;
 
         if (applyPlan) {
             if (profile == null) {
-                for (int i = 0; i < planCount; i++) {
-                    fieldOf[i] = PatchData.TRANSFORM_FIELD[i];
-                    numOf[i] = PatchData.TRANSFORM_NUM[i];
-                    denOf[i] = PatchData.TRANSFORM_DEN[i];
-                    minOf[i] = PatchData.TRANSFORM_MIN[i];
-                    maxOf[i] = PatchData.TRANSFORM_MAX[i];
-                }
-            } else {
-                planCount = 0;
-                for (int i = 0; i < profile.transformCount; i++) {
-                    ModProfile.Transform t = profile.transforms[i];
-                    int field = ModProfile.fieldIndex(t.field);
+                step(listener, 7, "No mod profile was selected...", 0.64);
+                result.code = ERR_PLAN;
+                return result;
+            }
+            for (int i = 0; i < profile.transformCount; i++) {
+                ModProfile.Transform t = profile.transforms[i];
+                int field = ModProfile.fieldIndex(t.field);
 
-                    if (!t.enabled || field < 0) {
-                        continue;
-                    }
-                    fieldOf[planCount] = field;
-                    numOf[planCount] = t.num;
-                    denOf[planCount] = t.den;
-                    minOf[planCount] = t.minValue;
-                    maxOf[planCount] = t.maxValue;
-                    planCount++;
+                if (!t.enabled || field < 0) {
+                    continue;
                 }
-                if (planCount == 0) {
-                    step(listener, 7, "No transform in this profile matches a known field...", 0.64);
-                    result.code = ERR_PLAN;
-                    return result;
-                }
+                fieldOf[planCount] = field;
+                numOf[planCount] = t.num;
+                denOf[planCount] = t.den;
+                minOf[planCount] = t.minValue;
+                maxOf[planCount] = t.maxValue;
+                planCount++;
+            }
+            if (planCount == 0) {
+                step(listener, 7, "No transform in this profile matches a known field...", 0.64);
+                result.code = ERR_PLAN;
+                return result;
             }
         }
 
         step(listener, 7, applyPlan
-                ? "Applying " + (profile == null ? PatchData.PLAN_NAME : profile.name)
-                        + " to a copy..."
-                : "Copying ROM; plan is OFF...", 0.64);
+                ? "Applying " + profile.name + " to a copy..."
+                : "Plan skipped; the copy is unchanged.", 0.64);
         System.arraycopy(rom, 0, out, 0, rom.length);
 
         int written = 0;

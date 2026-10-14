@@ -1,0 +1,31 @@
+{
+  "schema": "pit-patch-target-v1",
+  "notes": [
+    "This file holds only public constants: an expected hash, a NitroFS path, a record stride and field offsets recovered from the decompiled BattleEnemyStatRecord.",
+    "No retail ROM bytes, names, stats or other data derived from the ROM are stored here.",
+    "Both the C and Java patchers read this through generated source, so the two builds cannot drift apart.",
+    "The record layout was validated by applying a mod profile to the user's own ROM and comparing the result against tools/make_data_profile.py, matching all 588 fields across 98 records exactly.",
+    "Mod content is not described here: multipliers live in mods/<id>/profile.json, so a mod is an ordinary data folder rather than a compiled-in plan."
+  ],
+  "supported_rom": {
+    "region": "EUR",
+    "badge": "EUR ONLY",
+    "sha1": "ba4ec2f99b4f2e0047601552bccf00aa73e28701",
+    "title": "MARIO&LUIGI2",
+    "game_code": "ARMP",
+    "size": 67108864
+  },
+  "target": {
+    "nitrofs_path": "BData/BDataMon.dat",
+    "record_size": 44,
+    "record_count": 98,
+    "fields": [
+      { "name": "max_hp", "offset": 6, "label": "HP" },
+      { "name": "power", "offset": 8, "label": "POW" },
+      { "name": "defense", "offset": 10, "label": "DEF" },
+      { "name": "speed", "offset": 12, "label": "SPD" },
+      { "name": "experience", "offset": 32, "label": "EXP" },
+      { "name": "coins", "offset": 34, "label": "COIN" }
+    ]
+  }
+}

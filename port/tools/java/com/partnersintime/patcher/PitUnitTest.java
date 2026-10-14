@@ -88,26 +88,7 @@ public final class PitUnitTest {
         checkEq("target path", PatchData.TARGET_PATH.equals("BData/BDataMon.dat") ? 1 : 0, 1);
         checkEq("game code", PatchData.ROM_GAME_CODE.equals("ARMP") ? 1 : 0, 1);
         checkEq("sha1 length", PatchData.ROM_SHA1.length(), 40);
-        checkEq("transform count", PatchData.TRANSFORM_NUM.length, 6);
-        checkEq("all arrays agree on length", PatchData.TRANSFORM_DEN.length, 6);
-        checkEq("labels", PatchData.TRANSFORM_LABEL.length, 6);
-        checkEq("scale labels", PatchData.TRANSFORM_SCALE.length, 6);
         checkEq("field offsets", PatchData.FIELD_OFFSETS.length, 6);
-
-        /*
-         * Every transform must name a real field. A drift here would make the
-         * patcher write a scaled value into the wrong field silently, which is
-         * the worst failure this tool can have.
-         */
-        for (int t = 0; t < PatchData.TRANSFORM_FIELD.length; t++) {
-            int field = PatchData.TRANSFORM_FIELD[t];
-            check("transform " + t + " field index", field >= 0
-                    && field < PatchData.FIELD_OFFSETS.length);
-            check("transform " + t + " positive denominator",
-                    PatchData.TRANSFORM_DEN[t] > 0);
-            check("transform " + t + " min <= max",
-                    PatchData.TRANSFORM_MIN[t] <= PatchData.TRANSFORM_MAX[t]);
-        }
 
         /* The recovered offsets of BattleEnemyStatRecord, pinned independently. */
         checkEq("max_hp offset", PatchData.FIELD_OFFSETS[0], 6);
@@ -178,15 +159,15 @@ public final class PitUnitTest {
 
     private static void testRejectsBadInput() {
         byte[] rom = new byte[1024];
-        Patcher.Result result = Patcher.run(rom, new byte[rom.length], true, null);
+        Patcher.Result result = Patcher.run(rom, new byte[rom.length], true, null, null);
         checkEq("wrong size rejected", result.code, Patcher.ERR_SIZE);
 
         byte[] right = new byte[PatchData.ROM_SIZE];
-        Patcher.Result sized = Patcher.run(right, new byte[PatchData.ROM_SIZE], true, null);
+        Patcher.Result sized = Patcher.run(right, new byte[PatchData.ROM_SIZE], true, null, null);
         checkEq("wrong sha1 rejected", sized.code, Patcher.ERR_SHA1);
 
         /* An output buffer smaller than the input must not be touched. */
-        Patcher.Result small = Patcher.run(rom, new byte[16], true, null);
+        Patcher.Result small = Patcher.run(rom, new byte[16], true, null, null);
         checkEq("undersized output rejected", small.code, Patcher.ERR_ARGS);
 
         check("error text is non-empty",
@@ -606,10 +587,10 @@ public final class PitUnitTest {
 
     private static void testShippedProfileMatchesOracle() {
         /*
-         * The strongest guarantee the launcher can make: reading the profile the
-         * repository actually ships must reproduce the compiled-in Hard Mode
-         * table exactly. If these drift, the profile path and the built-in path
-         * would patch the ROM differently.
+         * The repository's shipped hard_mode profile, pinned field by field.
+         * The profile is now the only source of the multipliers, so this test
+         * guards the balance target itself: a drift here silently changes every
+         * patched cartridge.
          */
         String json = "{\"schema\":\"pit-mod-profile-v1\",\"id\":\"hard_mode\","
                 + "\"name\":\"Hard Mode\",\"version\":\"1.0.0\","
@@ -621,6 +602,11 @@ public final class PitUnitTest {
                 + "{\"field\":\"coins\",\"scale\":1.75},"
                 + "{\"field\":\"experience\",\"scale\":1.75}]}";
 
+        String[] field = {"max_hp", "power", "defense", "speed", "coins", "experience"};
+        long[] num = {11L, 2L, 21L, 5L, 7L, 7L};
+        long[] den = {10L, 1L, 20L, 4L, 4L, 4L};
+        int[] min = {1, 0, 1, 1, 0, 0};
+
         ModProfile shipped;
         try {
             shipped = ModProfile.parse(json);
@@ -629,34 +615,31 @@ public final class PitUnitTest {
             return;
         }
 
-        checkEq("shipped transform count", shipped.transformCount,
-                PatchData.TRANSFORM_NUM.length);
+        checkEq("shipped transform count", shipped.transformCount, field.length);
 
         /*
          * Compared by field name, not by position: the profile is free to list
-         * transforms in any order (the shipped one lists coins before
-         * experience) because each transform names its own target. What must
-         * hold is that every compiled-in entry is reproduced exactly.
+         * transforms in any order because each transform names its own target.
+         * What must hold is that every pinned entry is reproduced exactly.
          */
-        for (int i = 0; i < PatchData.TRANSFORM_NUM.length; i++) {
-            String field = PatchData.FIELD_NAMES[PatchData.TRANSFORM_FIELD[i]];
+        for (int i = 0; i < field.length; i++) {
             ModProfile.Transform t = null;
 
             for (int j = 0; j < shipped.transformCount; j++) {
-                if (shipped.transforms[j].field.equals(field)) {
+                if (shipped.transforms[j].field.equals(field[i])) {
                     t = shipped.transforms[j];
                     break;
                 }
             }
             if (t == null) {
-                failures.add("shipped profile is missing " + field);
+                failures.add("shipped profile is missing " + field[i]);
                 continue;
             }
-            checkEq("shipped num " + field, t.num, PatchData.TRANSFORM_NUM[i]);
-            checkEq("shipped den " + field, t.den, PatchData.TRANSFORM_DEN[i]);
-            checkEq("shipped min " + field, t.minValue, PatchData.TRANSFORM_MIN[i]);
-            checkEq("shipped max " + field, t.maxValue, PatchData.TRANSFORM_MAX[i]);
-            checkEq("shipped enabled " + field, t.enabled ? 1 : 0, 1);
+            checkEq("shipped num " + field[i], t.num, num[i]);
+            checkEq("shipped den " + field[i], t.den, den[i]);
+            checkEq("shipped min " + field[i], t.minValue, min[i]);
+            checkEq("shipped max " + field[i], t.maxValue, 65535);
+            checkEq("shipped enabled " + field[i], t.enabled ? 1 : 0, 1);
         }
     }
 

@@ -168,10 +168,10 @@ static unsigned long long gcd_ull(unsigned long long a, unsigned long long b)
 /*
  * Reduces a decimal literal to an exact rational.
  *
- * The fraction is reduced because that is the form the plan generator emits:
- * Fraction("1.1") is 11/10, and a label built from 11/10 therefore reads the
- * same as the built-in table. An exponent is rejected; the schema is plain
- * decimals, and reading one as a different scale would be worse than refusing.
+ * The fraction is reduced to lowest terms, so Fraction("1.1") is 11/10 and a
+ * label built from it stays short and readable. An exponent is rejected; the
+ * schema is plain decimals, and reading one as a different scale would be worse
+ * than refusing.
  */
 static const char *parse_scale(const char *p, const char *end,
                                unsigned int *num, unsigned int *den)

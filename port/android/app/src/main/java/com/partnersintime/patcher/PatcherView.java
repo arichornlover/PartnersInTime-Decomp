@@ -44,6 +44,9 @@ public final class PatcherView extends View {
     public static final int UI_W = 480;
     public static final int UI_H = 320;
 
+    /** Shown in the header chip; independent of any mod profile. */
+    private static final String LAUNCHER_VERSION = "0.1";
+
     private static final int FONT_W = 8;
     private static final int FONT_H = 8;
     private static final int LINE_H = 10;
@@ -96,9 +99,8 @@ private static final int MODS_CARD_H = 196;
 private static final int MODS_HINT_Y = MODS_CARD_Y + MODS_CARD_H + 10;
 
 /*
- * The MODS list, mirroring pit_patcher_ui.c: two built-in rows, then whatever
- * mods/<id>/profile.json the scan found, in four fixed-height rows that scroll
- * around the selection.
+ * The MODS list: the "No mod" row, then whatever mods/<id>/profile.json the
+ * scan found, in four fixed-height rows that scroll around the selection.
  */
 private static final int MOD_ROW_H = 15;
 private static final int MOD_ROW_GAP = 2;
@@ -215,7 +217,7 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
         public int totalSteps = Patcher.STEPS;
         public int tab = TAB_PATCH;
 
-        /* Row 0 is "no mod", row 1 the built-in plan, row 2+ discovered profiles. */
+        /* Row 0 is "no mod", row 1+ discovered profiles. */
         public int modIndex;
         public ModProfile.Catalog mods = ModProfile.Catalog.empty();
         public int focus = FOCUS_NONE;
@@ -550,7 +552,7 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
         text(canvas, MARGIN + 2, 30, "DECOMP ROM WORKSHOP", C_ACCENT);
 
         /* Version chip, right aligned. */
-        String version = PatchData.PLAN_VERSION;
+        String version = LAUNCHER_VERSION;
         int chipW = textWidth(version) + 14;
         int chipX = UI_W - MARGIN - chipW;
 
@@ -633,46 +635,39 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
     }
 
     /*
-     * MODS rows, mirroring pit_patcher_ui.c:
-     *   0  No Mod            no profile at all
-     *   1  Hard Mode         the compiled-in plan, also shipped as mods/hard_mode
-     *   2+ discovered        mods/<id>/profile.json
+     * MODS rows:
+     *   0   No Mod            no profile at all
+     *   1+  discovered        mods/<id>/profile.json
      *
-     * Rows 0 and 1 need no profile.json: the patcher already knows the built-in
-     * plan, and a null profile selects exactly that plan.
+     * Row 0 needs no profile.json: the launcher verifies the ROM and hands it
+     * to the decomp unchanged.
      */
     private int modRowCount() {
-        return 2 + state.mods.count();
+        return 1 + state.mods.count();
     }
 
     private static boolean modRowIsDiscovered(int row) {
-        return row >= 2;
+        return row >= 1;
     }
 
     private String modName(int row) {
         if (row == 0) {
             return "NO MOD";
         }
-        if (row == 1) {
-            return PatchData.PLAN_NAME;
-        }
-        return state.mods.at(row - 2).name;
+        return state.mods.at(row - 1).name;
     }
 
     private String modId(int row) {
         if (row == 0) {
             return "";
         }
-        if (row == 1) {
-            return PatchData.PLAN_ID;
-        }
-        return state.mods.at(row - 2).id;
+        return state.mods.at(row - 1).id;
     }
 
-    /** Null means "use the built-in plan", which also covers the no-mod row. */
+    /** Null covers the no-mod row; applying with it needs no profile. */
     private ModProfile modProfile(int row) {
         if (modRowIsDiscovered(row)) {
-            return state.mods.at(row - 2);
+            return state.mods.at(row - 1);
         }
         return null;
     }
@@ -736,9 +731,6 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
                         C_PANEL_HI);
                 rect(canvas, MOD_ROW_X, ry + 3, 2, MOD_ROW_H - 6, C_AMBER);
             }
-            if (row >= 2 && PatchData.PLAN_ID.equals(modId(row))) {
-                text(canvas, MOD_ROW_X + 2, ry + 4, "*", C_AMBER);
-            }
             textClipped(canvas, MOD_NAME_X, ry + 4, modName(row), fg,
                     MOD_ROW_W - 34);
             {
@@ -759,37 +751,24 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
                     MOD_ROW_W);
         } else {
             text(canvas, MOD_ROW_X, MODS_DESC_Y,
-                    "A DATA MOD THAT RAISES ENEMY STATS AND PAYS", C_DIM);
+                    "A DATA MOD LOADED FROM THE MODS FOLDER.", C_DIM);
             text(canvas, MOD_ROW_X, MODS_DESC_Y + LINE_H,
-                    "IT BACK WITH MORE EXPERIENCE AND COINS.", C_DIM);
+                    "SEE ITS README FOR WHAT IT CHANGES.", C_DIM);
         }
         hline(canvas, MODS_CARD_X + 12, MODS_DIV_Y, MODS_CARD_W - 24, C_EDGE_SOFT);
 
         if (state.modIndex != 0) {
-            if (profile != null) {
-                int count = Math.min(profile.transformCount, PatchData.TRANSFORM_LABEL.length);
+            int count = profile.transformCount;
 
-                for (int i = 0; i < count; i++) {
-                    ModProfile.Transform t = profile.transforms[i];
-                    int col = i % CHIP_COUNT;
-                    int row = i / CHIP_COUNT;
-                    int cx = CHIP_X0 + col * (CHIP_W + CHIP_GAP);
-                    int cy = CHIP_Y0 + row * CHIP_DY;
+            for (int i = 0; i < count; i++) {
+                ModProfile.Transform t = profile.transforms[i];
+                int col = i % CHIP_COUNT;
+                int row = i / CHIP_COUNT;
+                int cx = CHIP_X0 + col * (CHIP_W + CHIP_GAP);
+                int cy = CHIP_Y0 + row * CHIP_DY;
 
-                    drawChip(canvas, cx, cy, CHIP_W, CHIP_H, t.field,
-                            t.scaleText(), t.enabled);
-                }
-            } else {
-                for (int i = 0; i < PatchData.TRANSFORM_LABEL.length; i++) {
-                    int col = i % CHIP_COUNT;
-                    int row = i / CHIP_COUNT;
-                    int cx = CHIP_X0 + col * (CHIP_W + CHIP_GAP);
-                    int cy = CHIP_Y0 + row * CHIP_DY;
-
-                    drawChip(canvas, cx, cy, CHIP_W, CHIP_H,
-                            PatchData.TRANSFORM_LABEL[i], PatchData.TRANSFORM_SCALE[i],
-                            true);
-                }
+                drawChip(canvas, cx, cy, CHIP_W, CHIP_H, t.field,
+                        t.scaleText(), t.enabled);
             }
         } else {
             text(canvas, MOD_ROW_X, CHIP_Y0,
@@ -797,7 +776,7 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
             text(canvas, MOD_ROW_X, CHIP_Y0 + LINE_H,
                     "PASSES IT TO THE DECOMP - NO MOD IS APPLIED.", C_DIM);
             text(canvas, MOD_ROW_X, CHIP_Y0 + 2 * LINE_H,
-                "TAP THE TOGGLE FOR HARD MODE, THEN INGEST.", C_DIM);
+                "PICK A MOD FROM THE LIST, THEN INGEST.", C_DIM);
         }
 
         text(canvas, MARGIN, MODS_HINT_Y,
@@ -840,9 +819,8 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
             text(canvas, ABOUT_CARD_X + 12, ly, lines[i], C_TEXT);
         }
         text(canvas, ABOUT_CARD_X + 12, ABOUT_CARD_Y + ABOUT_CARD_H - 14,
-                PatchData.PLAN_ID + " v" + PatchData.PLAN_VERSION + " | "
-                        + PatchData.RECORD_COUNT + " x " + PatchData.RECORD_SIZE
-                        + "-BYTE RECORDS",
+                "LAUNCHER " + LAUNCHER_VERSION + " | " + PatchData.RECORD_COUNT
+                        + " x " + PatchData.RECORD_SIZE + "-BYTE RECORDS",
                 C_DIM);
     }
 
@@ -993,7 +971,7 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
     private void drawPatchTab(Canvas canvas) {
         drawFields(canvas);
 
-        /* Plan status on the left, keyboard hints on the right. */
+        /* Mod status on the left, keyboard hints on the right. */
         String mods = "MODS: "
                 + (state.modIndex == 0 ? "NONE" : modName(state.modIndex));
 
@@ -1204,10 +1182,6 @@ private static final int MODS_DIV_Y = MODS_DESC_Y + 2 * LINE_H + 2;
         if (row == 0) {
             addLog(LOG_INFO, "Mod OFF: the copy is prepared without mods.");
         } else if (!previousId.equals(modId(row))) {
-            /*
-             * Row 1 is the compiled-in plan and a discovered hard_mode profile
-             * is the same data, so only a real change of id is worth reporting.
-             */
             addLog(LOG_INFO, "Mod selected: " + modName(row) + ".");
         }
     }

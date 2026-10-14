@@ -17,7 +17,7 @@ void ConfigDefaults(Config &cfg)
 {
     cfg.source_rom.clear();
     cfg.output_rom.clear();
-    cfg.mods_dir = "mods";
+    cfg.mods_dir.clear();  /* empty means "mods beside the launcher" */
     cfg.mod_id.clear();
     cfg.export_assets = true;
     cfg.vsync = true;
@@ -102,9 +102,6 @@ bool ConfigLoad(Config &cfg, const std::string &path)
 
     if (c.ui_scale < 0.7f || c.ui_scale > 1.8f) {
         c.ui_scale = 1.0f;
-    }
-    if (c.mods_dir.empty()) {
-        c.mods_dir = "mods";
     }
     cfg = c;
     return true;

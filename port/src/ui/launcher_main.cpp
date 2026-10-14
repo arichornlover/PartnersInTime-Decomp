@@ -57,8 +57,13 @@ extern "C" {
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <sys/stat.h>
 #include <thread>
 #include <vector>
+
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 static const char *k_version = "PiT Launcher 0.1";
 
@@ -74,7 +79,6 @@ struct ModEntry {
     std::string applies;
     std::string summary;
     const pit_mod_profile *profile = nullptr;
-    bool builtin = false;
 };
 
 struct LogLine {
@@ -182,9 +186,6 @@ static std::string SuffixFor(const App &app, int idx)
     if (idx <= 0) {
         return ".prepared.nds";
     }
-    if (idx == 1) {
-        return ".hardmode.nds";
-    }
     std::string id = SafeId(app.mods[idx].id);
     if (id.empty()) {
         return ".prepared.nds";
@@ -208,6 +209,109 @@ static void DeriveOutput(App *app)
 
 /* --------------------------------------------------------------- mod scan */
 
+/*
+ * Hard Mode is an ordinary mod: a folder called hard_mode holding a
+ * profile.json. The release ships one from port/mods, and the launcher also
+ * recreates it on first run so a user who clears the folder still starts with a
+ * working default. The embedded copy mirrors port/mods/hard_mode/profile.json;
+ * keep the two in step.
+ */
+static const char *k_hard_mode_profile = R"PITPROFILE({
+  "schema": "pit-mod-profile-v1",
+  "id": "hard_mode",
+  "name": "Hard Mode",
+  "version": "1.0.0",
+  "license": "CC-BY-4.0",
+  "authors": [],
+  "description": "Raises enemy durability and offence for a real difficulty spike, while rewards keep the loop from dragging.",
+  "applies_to": {
+    "version": "eur",
+    "stat_document": "stats/enemies.json"
+  },
+  "transforms": [
+    { "field": "max_hp", "scale": 1.1, "min": 1, "max": 65535, "enabled": true },
+    { "field": "power", "scale": 2.0, "min": 0, "max": 65535, "enabled": true },
+    { "field": "defense", "scale": 1.05, "min": 1, "max": 65535, "enabled": true },
+    { "field": "speed", "scale": 1.25, "min": 1, "max": 65535, "enabled": true },
+    { "field": "coins", "scale": 1.75, "min": 0, "max": 65535, "enabled": true },
+    { "field": "experience", "scale": 1.75, "min": 0, "max": 65535, "enabled": true }
+  ]
+})PITPROFILE";
+
+static const char *k_mods_readme =
+    "Mods\r\n"
+    "====\r\n"
+    "\r\n"
+    "Each subfolder here is one mod: <id>/profile.json.\r\n"
+    "\r\n"
+    "A profile only scales the numeric fields of the stat record it names; it\r\n"
+    "never carries ROM data. The launcher lists every valid profile it finds in\r\n"
+    "this folder, so adding a mod is dropping in a folder.\r\n";
+
+static bool FileExists(const std::string &path)
+{
+    FILE *fp = std::fopen(path.c_str(), "rb");
+    if (fp) {
+        std::fclose(fp);
+        return true;
+    }
+    return false;
+}
+
+static void EnsureDir(const std::string &path)
+{
+#ifdef _WIN32
+    _mkdir(path.c_str());
+#else
+    mkdir(path.c_str(), 0755);
+#endif
+}
+
+static void WriteTextFile(const std::string &path, const char *text)
+{
+    FILE *fp = std::fopen(path.c_str(), "wb");
+    if (!fp) {
+        return;
+    }
+    std::fwrite(text, 1, std::strlen(text), fp);
+    std::fclose(fp);
+}
+
+/* Default mods folder: a "mods" folder beside the launcher executable. */
+static std::string DefaultModsDir()
+{
+    char *base = SDL_GetBasePath();
+    if (!base) {
+        return "mods";
+    }
+    std::string dir = base;
+    SDL_free(base);
+    while (!dir.empty() && (dir.back() == '/' || dir.back() == '\\')) {
+        dir.pop_back();
+    }
+    if (dir.empty()) {
+        return "mods";
+    }
+    return dir + "/mods";
+}
+
+static void SeedModsDir(const std::string &dir)
+{
+    if (dir.empty()) {
+        return;
+    }
+    EnsureDir(dir);
+    if (!FileExists(dir + "/README.txt")) {
+        WriteTextFile(dir + "/README.txt", k_mods_readme);
+    }
+
+    std::string hm = dir + "/hard_mode";
+    EnsureDir(hm);
+    if (!FileExists(hm + "/profile.json")) {
+        WriteTextFile(hm + "/profile.json", k_hard_mode_profile);
+    }
+}
+
 static void BuildModList(App *app)
 {
     app->mods.clear();
@@ -217,22 +321,7 @@ static void BuildModList(App *app)
     none.desc = "Prepare a clean, header-repaired copy of your own cartridge.";
     none.applies = PIT_PLAN_ROM_BADGE;
     none.summary = "no changes";
-    none.builtin = true;
     app->mods.push_back(none);
-
-    ModEntry hard;
-    hard.id = PIT_PLAN_ID;
-    hard.name = PIT_PLAN_NAME;
-    hard.version = PIT_PLAN_VERSION;
-    hard.desc = "Built-in rebalance: raises enemy stats and battle rewards.";
-    hard.applies = PIT_PLAN_ROM_BADGE;
-    {
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "%u fields scaled", PIT_TRANSFORM_COUNT);
-        hard.summary = buf;
-    }
-    hard.builtin = true;
-    app->mods.push_back(hard);
 
     char err[256] = {0};
     unsigned int skipped = 0;
@@ -275,7 +364,7 @@ static void RunPipeline(App *app)
 
     int apply = app->selected >= 1 ? 1 : 0;
     const pit_mod_profile *profile = nullptr;
-    if (app->selected >= 2 && app->selected < static_cast<int>(app->mods.size())) {
+    if (app->selected >= 1 && app->selected < static_cast<int>(app->mods.size())) {
         profile = app->mods[app->selected].profile;
     }
 
@@ -605,8 +694,8 @@ static void ViewHome(App *app)
     ImGui::TextUnformatted(mod_name);
     ImGui::PopStyleColor();
     ImGui::SameLine();
-    HelpMarker("Choose a profile on the MODS tab. The built-in HARD MODE and any "
-               "folder under mods/ are listed there.");
+    HelpMarker("Choose a profile on the MODS tab. The bundled HARD MODE mod and "
+               "any folder under mods/ are listed there.");
     ImGui::SameLine();
     if (ImGui::Checkbox("Auto-name", &app->auto_output)) {
         DeriveOutput(app);
@@ -756,49 +845,6 @@ static void ViewMods(App *app)
         ImGui::Text("Applies to: %s", m.applies.empty() ? "any" : m.applies.c_str());
         ImGui::Text("%s", m.summary.c_str());
         ImGui::PopStyleColor();
-
-        if (m.profile != nullptr && m.profile->transform_count > 0) {
-            ImGui::Dummy(ImVec2(0.0f, 6.0f));
-            if (ImGui::BeginTable("##tf", 3,
-                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                                      ImGuiTableFlags_SizingStretchProp)) {
-                ImGui::TableSetupColumn("Field");
-                ImGui::TableSetupColumn("Scale");
-                ImGui::TableSetupColumn("On");
-                ImGui::TableHeadersRow();
-                for (unsigned int t = 0; t < m.profile->transform_count; t++) {
-                    const pit_mod_transform &tr = m.profile->transforms[t];
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted(tr.field);
-                    ImGui::TableNextColumn();
-                    ImGui::Text("%u/%u", tr.num, tr.den);
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted(tr.enabled ? "yes" : "no");
-                }
-                ImGui::EndTable();
-            }
-        } else if (app->selected == 1) {
-            ImGui::Dummy(ImVec2(0.0f, 6.0f));
-            if (ImGui::BeginTable("##tfb", 3,
-                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                                      ImGuiTableFlags_SizingStretchProp)) {
-                ImGui::TableSetupColumn("Field");
-                ImGui::TableSetupColumn("Scale");
-                ImGui::TableSetupColumn("On");
-                ImGui::TableHeadersRow();
-                for (unsigned int t = 0; t < PIT_TRANSFORM_COUNT; t++) {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted(PIT_PLAN_TRANSFORMS[t].label);
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted(PIT_PLAN_TRANSFORMS[t].scale_text);
-                    ImGui::TableNextColumn();
-                    ImGui::TextUnformatted("yes");
-                }
-                ImGui::EndTable();
-            }
-        }
     }
     CardEnd();
 
@@ -810,6 +856,7 @@ static void ViewMods(App *app)
     ImGui::SameLine();
     if (ImGui::Button("Rescan", ImVec2(110.0f, 0.0f))) {
         app->cfg.mods_dir = app->mods_buf;
+        SeedModsDir(app->mods_buf);
         BuildModList(app);
         DeriveOutput(app);
     }
@@ -855,6 +902,7 @@ static void ViewSettings(App *app)
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
     if (GoldButton("Save settings", ImVec2(180.0f, 36.0f))) {
         app->cfg.mods_dir = app->mods_buf;
+        SeedModsDir(app->mods_buf);
         if (app->selected >= 0 && app->selected < static_cast<int>(app->mods.size())) {
             app->cfg.mod_id = app->mods[app->selected].id;
         }
@@ -921,7 +969,7 @@ static void ViewAbout(App *app)
     ImGui::BulletText("EUR  -  SHA-1 ba4ec2f9...e28701  (ARMP, 64 MiB)");
     ImGui::PushStyleColor(ImGuiCol_Text, g_pal.text_dim);
     ImGui::TextWrapped("USA and USA Rev 1 cartridges are recognised but the "
-                       "built-in mod plan targets the EUR release.");
+                       "shipped mods target the EUR release.");
     ImGui::PopStyleColor();
 
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
@@ -1031,7 +1079,8 @@ static void PrintUsage(void)
     std::printf(
         "%s\n"
         "Usage: pit_launcher [options] [source.nds] [output.nds]\n"
-        "  --mods-dir <dir>       folder scanned for mod profiles (default mods)\n"
+        "  --mods-dir <dir>       folder scanned for mod profiles (default: mods\n"
+        "                         beside the launcher executable)\n"
         "  --hidden               do not show the window (for checks)\n"
         "  --frames <n>           render n frames then exit (for checks)\n"
         "  --screenshot <file>    write a .bmp of the last frame\n"
@@ -1047,8 +1096,6 @@ int main(int argc, char **argv)
     int positional = 0;
 
     App app;
-    std::snprintf(app.mods_buf, sizeof(app.mods_buf), "mods");
-
     app.src_buf[0] = '\0';
     app.out_buf[0] = '\0';
     app.mods_buf[0] = '\0';
@@ -1087,9 +1134,12 @@ int main(int argc, char **argv)
     app.cfg_path = pit::ui::ConfigPath();
     pit::ui::ConfigLoad(app.cfg, app.cfg_path);
     if (app.mods_buf[0] == '\0') {
-        std::snprintf(app.mods_buf, sizeof(app.mods_buf), "%s",
-                      app.cfg.mods_dir.empty() ? "mods" : app.cfg.mods_dir.c_str());
+        std::string dir = app.cfg.mods_dir.empty() ? DefaultModsDir()
+                                                   : app.cfg.mods_dir;
+        std::snprintf(app.mods_buf, sizeof(app.mods_buf), "%s", dir.c_str());
     }
+    /* Generate the mods folder (with Hard Mode) beside the launcher if absent. */
+    SeedModsDir(app.mods_buf);
     if (app.src_buf[0] == '\0' && !app.cfg.source_rom.empty()) {
         std::snprintf(app.src_buf, sizeof(app.src_buf), "%s", app.cfg.source_rom.c_str());
     }

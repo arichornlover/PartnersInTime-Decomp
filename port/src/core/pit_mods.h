@@ -12,10 +12,9 @@
  * the launcher. A profile only names a field and a scale, which means a new mod
  * is a new folder and never a rebuild.
  *
- * Scales are kept as exact integer rationals. The generator that produces the
- * built-in Hard Mode table, the Python data-profile pipeline and this reader all
- * reduce a decimal literal to num/den the same way, so a value landing exactly
- * on a .5 boundary rounds identically in every implementation.
+ * Scales are kept as exact integer rationals. The Python data-profile pipeline
+ * and this reader both reduce a decimal literal to num/den the same way, so a
+ * value landing exactly on a .5 boundary rounds identically in both.
  */
 #ifndef PIT_MODS_H
 #define PIT_MODS_H
@@ -86,8 +85,8 @@ typedef struct {
 } pit_mod_catalog;
 
 /*
- * Exact half-up scaling with a clamp, shared by the built-in plan and by every
- * discovered profile so both take the same rounding path.
+ * Exact half-up scaling with a clamp, shared by every discovered profile so
+ * each takes the same rounding path.
  */
 unsigned int pit_mods_scale(unsigned int value, unsigned int num,
                             unsigned int den, unsigned int min_value,

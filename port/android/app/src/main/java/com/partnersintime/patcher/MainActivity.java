@@ -75,7 +75,7 @@ public final class MainActivity extends Activity implements PatcherView.Callback
      *
      * <p>Each profile is rewritten every launch so a repaired or updated profile
      * replaces an older copy, and a failed install is reported instead of being
-     * hidden: the built-in Hard Mode plan stays available either way.
+     * hidden.
      */
     private void loadMods() {
         File root = new File(getFilesDir(), "mods");
@@ -155,8 +155,7 @@ public final class MainActivity extends Activity implements PatcherView.Callback
     }
 
     private String modId(int index) {
-        return index == 0 ? "" : (index == 1 ? PatchData.PLAN_ID
-                : view.state().mods.at(index - 2).id);
+        return index == 0 ? "" : view.state().mods.at(index - 1).id;
     }
 
     /**
@@ -393,12 +392,13 @@ public final class MainActivity extends Activity implements PatcherView.Callback
         view.setBusy(true);
 
         /*
-         * Row 0 is no mod, row 1 the compiled-in plan (a null profile selects
-         * exactly that) and row 2+ the profile the user picked.
+         * Row 0 is "No mod" (a null profile, a plain verified copy); row 1+ is
+         * the profile the user picked. Hard Mode is an ordinary bundled profile
+         * now, so there is no compiled-in plan to special-case.
          */
         final int modIndex = view.state().modIndex;
         final boolean applyPlan = modIndex != 0;
-        final ModProfile profile = modIndex >= 2 ? view.state().mods.at(modIndex - 2)
+        final ModProfile profile = modIndex >= 1 ? view.state().mods.at(modIndex - 1)
                 : null;
 
         new Thread(new Runnable() {

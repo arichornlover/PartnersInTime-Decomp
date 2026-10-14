@@ -2,22 +2,23 @@
 """Generate the shared patcher data for both the C and Java builds.
 
 The Windows patcher is C/SDL2 and the Android patcher is pure Java. Neither
-should hand-copy patch constants, because a silent drift between the two would
-produce different patched ROMs from the same input. Both therefore compile
-against data generated here from one authoritative plan.
+should hand-copy the cartridge constants or the record layout, because a silent
+drift between the two would produce different patched ROMs from the same input.
+Both therefore compile against data generated here from one authoritative
+description.
 
 Sources:
-  tools/patch_sources/hard_mode_plan.json  public constants only
+  tools/patch_sources/patch_target.json    public constants only
   tools/patch_sources/font8x8.txt          original bitmap font
 
 Outputs:
   src/core/pit_patch_data.h                        C header
   android/.../patcher/PatchData.java               Java class
 
-Scales are emitted as exact integer numerators and denominators rather than
-doubles. Rounding then becomes integer arithmetic in all three languages, so
-C, Java and tools/make_data_profile.py cannot disagree on a value that lands
-exactly on a .5 boundary.
+Only the supported cartridge identity, the record layout and the bitmap font
+are emitted. Mod content - the multipliers - is not generated: it lives in
+mods/<id>/profile.json, so adding or changing a mod is a data edit and never a
+rebuild.
 """
 
 from __future__ import annotations
@@ -26,7 +27,6 @@ import argparse
 import json
 import re
 import sys
-from fractions import Fraction
 from pathlib import Path
 
 FONT_FIRST = 0x20
@@ -85,30 +85,9 @@ def java_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def scale_label(frac: Fraction) -> str:
-    """Short exact display form, e.g. "x11/10" or "x2".
-
-    Shown in the plan panel of both UIs. It is derived from the same Fraction
-    the patch math uses, so the label cannot describe a different multiplier
-    than the one applied.
-    """
-    if frac.denominator == 1:
-        return f"x{frac.numerator}"
-    return f"x{frac.numerator}/{frac.denominator}"
-
-
 def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
     rom = plan["supported_rom"]
     target = plan["target"]
-    transforms = plan["transforms"]
-    fields = {f["name"]: f for f in target["fields"]}
-
-    for t in transforms:
-        if t["field"] not in fields:
-            raise SystemExit(f"transform {t['field']!r} has no matching field")
-    for name in fields:
-        if not any(t["field"] == name for t in transforms):
-            raise SystemExit(f"field {name!r} has no transform")
 
     header: list[str] = []
     add = header.append
@@ -117,20 +96,14 @@ def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
     add(BANNER)
     add(" *")
     add(" * Every value below is a public constant: an expected hash, a NitroFS")
-    add(" * path, a record stride, field offsets recovered from the decompiled")
-    add(" * BattleEnemyStatRecord, and multipliers. No retail ROM bytes, names or")
-    add(" * stats are stored here. The patcher reads those from the user's ROM.")
+    add(" * path, a record stride and field offsets recovered from the decompiled")
+    add(" * BattleEnemyStatRecord. No retail ROM bytes, names or stats are stored")
+    add(" * here: the patcher reads those from the user's ROM, and the multipliers")
+    add(" * come from a mod profile under mods/.")
     add(" */")
     add("#ifndef PIT_PATCH_DATA_H")
     add("#define PIT_PATCH_DATA_H")
     add("")
-    add("#define PIT_PLAN_ID          " + c_string(plan["id"]))
-    add("#define PIT_PLAN_NAME       " + c_string(plan["name"]))
-    add("#define PIT_PLAN_VERSION    " + c_string(plan["version"]))
-    add("")
-    # These are prefixed PIT_PLAN_ROM_ rather than PIT_ROM_ because pit_rom.h
-    # already defines PIT_ROM_SHA1. Both describe the same EUR ROM, but two
-    # macros with one meaning invites a silent mismatch later.
     add("#define PIT_PLAN_ROM_SHA1      " + c_string(rom["sha1"]))
     add("#define PIT_PLAN_ROM_TITLE     " + c_string(rom["title"]))
     add("#define PIT_PLAN_ROM_GAME_CODE " + c_string(rom["game_code"]))
@@ -143,7 +116,6 @@ def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
     add("")
     add("#define PIT_FIELD_COUNT     "
         f"{len(target['fields'])}u")
-    add("#define PIT_TRANSFORM_COUNT " + f"{len(transforms)}u")
     add("")
 
     add("typedef struct {")
@@ -156,27 +128,6 @@ def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
     for f in target["fields"]:
         add("    { " + c_string(f["name"]) + ", " + c_string(f["label"])
             + f", {f['offset']}u }},")
-    add("};")
-    add("")
-
-    add("typedef struct {")
-    add("    const char *field;")
-    add("    const char *label;")
-    add("    const char *scale_text;  /* display form of num / den */")
-    add("    unsigned int num;  /* scale is exactly num / den */")
-    add("    unsigned int den;")
-    add("    unsigned int min_value;")
-    add("    unsigned int max_value;")
-    add("} pit_plan_transform;")
-    add("")
-    add("static const pit_plan_transform")
-    add("    PIT_PLAN_TRANSFORMS[PIT_TRANSFORM_COUNT] = {")
-    for t in transforms:
-        frac = Fraction(str(t["scale"]))
-        add("    { " + c_string(t["field"]) + ", " + c_string(t["label"]) + ", "
-            + c_string(scale_label(frac))
-            + f", {frac.numerator}u, {frac.denominator}u, "
-            + f"{t['min']}u, {t['max']}u }},")
     add("};")
     add("")
     add("/* Original 8x8 font. Bit 7 of each byte is the leftmost pixel. */")
@@ -205,11 +156,6 @@ def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
     jadd("    private PatchData() {")
     jadd("    }")
     jadd("")
-    jadd("    public static final String PLAN_ID = " + java_string(plan["id"]) + ";")
-    jadd("    public static final String PLAN_NAME = " + java_string(plan["name"]) + ";")
-    jadd("    public static final String PLAN_VERSION = "
-          + java_string(plan["version"]) + ";")
-    jadd("")
     jadd("    public static final String ROM_SHA1 = " + java_string(rom["sha1"]) + ";")
     jadd("    public static final String ROM_TITLE = " + java_string(rom["title"]) + ";")
     jadd("    public static final String ROM_GAME_CODE = "
@@ -236,41 +182,6 @@ def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
     jadd("        " + ", ".join(str(f["offset"]) for f in target["fields"]) + ",")
     jadd("    };")
     jadd("")
-    jadd("    public static final int[] TRANSFORM_FIELD = {")
-    for idx, t in enumerate(transforms):
-        jadd(f"        {target['fields'].index(fields[t['field']])},")
-        del idx
-    jadd("    };")
-    jadd("")
-    jadd("    public static final int[] TRANSFORM_NUM = {")
-    jadd("        " + ", ".join(
-        str(Fraction(str(t["scale"])).numerator) for t in transforms) + ",")
-    jadd("    };")
-    jadd("")
-    jadd("    public static final int[] TRANSFORM_DEN = {")
-    jadd("        " + ", ".join(
-        str(Fraction(str(t["scale"])).denominator) for t in transforms) + ",")
-    jadd("    };")
-    jadd("")
-    jadd("    public static final int[] TRANSFORM_MIN = {")
-    jadd("        " + ", ".join(str(t["min"]) for t in transforms) + ",")
-    jadd("    };")
-    jadd("")
-    jadd("    public static final int[] TRANSFORM_MAX = {")
-    jadd("        " + ", ".join(str(t["max"]) for t in transforms) + ",")
-    jadd("    };")
-    jadd("")
-    jadd("    public static final String[] TRANSFORM_LABEL = {")
-    for t in transforms:
-        jadd("        " + java_string(t["label"]) + ",")
-    jadd("    };")
-    jadd("")
-    jadd("    /* Display form of TRANSFORM_NUM/TRANSFORM_DEN, e.g. \"x11/10\". */")
-    jadd("    public static final String[] TRANSFORM_SCALE = {")
-    for t in transforms:
-        jadd("        " + java_string(scale_label(Fraction(str(t["scale"])))) + ",")
-    jadd("    };")
-    jadd("")
     jadd("    public static final int FONT_FIRST = " + str(FONT_FIRST) + ";")
     jadd("    public static final int FONT_GLYPHS = " + str(len(glyphs)) + ";")
     jadd("")
@@ -288,7 +199,7 @@ def build(plan: dict, glyphs: dict[int, list[str]]) -> tuple[str, str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--plan", type=Path,
-                    default=Path("tools/patch_sources/hard_mode_plan.json"))
+                    default=Path("tools/patch_sources/patch_target.json"))
     ap.add_argument("--font", type=Path,
                     default=Path("tools/patch_sources/font8x8.txt"))
     ap.add_argument("--c-out", type=Path, default=Path("src/core/pit_patch_data.h"))

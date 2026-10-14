@@ -95,16 +95,16 @@ const char *pit_patch_result_text(pit_patch_result result)
     case PIT_PATCH_ERR_TARGET:      return "Target file is missing from this ROM's NitroFS.";
     case PIT_PATCH_ERR_TARGET_SIZE: return "Target file is not the expected record table.";
     case PIT_PATCH_ERR_WRITE:       return "The copy could not be written.";
-    case PIT_PATCH_ERR_PLAN:        return "The patch plan has no enabled transforms.";
+    case PIT_PATCH_ERR_PLAN:        return "The selected mod has no enabled transforms.";
     default:                       return "Unknown error.";
     }
 }
 
 /*
- * One resolved transform, whichever source it came from. The built-in plan and a
- * discovered profile are flattened into this so the record loop has a single
- * code path and a single rounding rule: pit_mods_scale, which is exact half-up
- * integer arithmetic on the rationals.
+ * One resolved transform from a discovered mod profile. Every profile is
+ * flattened into this so the record loop has a single code path and a single
+ * rounding rule: pit_mods_scale, which is exact half-up integer arithmetic on
+ * the rationals.
  */
 typedef struct {
     const char *field;
@@ -119,8 +119,8 @@ typedef struct {
  * Resolves transform field names against the launcher's own field table,
  * dropping any the table does not know. A profile that names a field this
  * release does not have is asking for something that cannot exist, so it is
- * skipped; if nothing at all resolves the plan is refused rather than writing
- * an untouched table and reporting it as patched.
+ * skipped; if nothing at all resolves the mod is refused rather than writing an
+ * untouched table and reporting it as patched.
  */
 static unsigned int resolve_transforms(const pit_mod_profile *profile,
                                        resolved_transform *out,
@@ -129,35 +129,18 @@ static unsigned int resolve_transforms(const pit_mod_profile *profile,
     unsigned int count = 0;
     unsigned int i;
 
-    if (profile) {
-        for (i = 0; i < profile->transform_count && count < capacity; i++) {
-            const pit_mod_transform *t = &profile->transforms[i];
-            unsigned int field;
-
-            /* A disabled transform is shown in the MODS list but never applied. */
-            if (!t->enabled) {
-                continue;
-            }
-            for (field = 0; field < PIT_FIELD_COUNT; field++) {
-                if (strcmp(PIT_PLAN_FIELDS[field].name, t->field) == 0) {
-                    out[count].field = PIT_PLAN_FIELDS[field].name;
-                    out[count].offset = PIT_PLAN_FIELDS[field].offset;
-                    out[count].num = t->num;
-                    out[count].den = t->den;
-                    out[count].min_value = t->min_value;
-                    out[count].max_value = t->max_value;
-                    count++;
-                    break;
-                }
-            }
-        }
-        return count;
+    if (!profile) {
+        return 0;
     }
 
-    for (i = 0; i < PIT_TRANSFORM_COUNT && count < capacity; i++) {
-        const pit_plan_transform *t = &PIT_PLAN_TRANSFORMS[i];
+    for (i = 0; i < profile->transform_count && count < capacity; i++) {
+        const pit_mod_transform *t = &profile->transforms[i];
         unsigned int field;
 
+        /* A disabled transform is shown in the MODS list but never applied. */
+        if (!t->enabled) {
+            continue;
+        }
         for (field = 0; field < PIT_FIELD_COUNT; field++) {
             if (strcmp(PIT_PLAN_FIELDS[field].name, t->field) == 0) {
                 out[count].field = PIT_PLAN_FIELDS[field].name;
@@ -327,7 +310,7 @@ pit_patch_result pit_patcher_run_ex(const char *input_path,
     /* Step 7: make a private copy, then apply the plan if it is enabled. */
     if (apply_plan) {
         snprintf(message, sizeof(message), "Applying %s to a copy...",
-                 profile ? profile->name : PIT_PLAN_NAME);
+                 profile->name);
         log_step(log, ctx, 7, message, 0.62);
     } else {
         log_step(log, ctx, 7, "Copying ROM; plan is OFF...", 0.62);
@@ -432,13 +415,4 @@ pit_patch_result pit_patcher_run_ex(const char *input_path,
     free(patched);
     log_step(log, ctx, 9, "ROM verified; copy written.", 1.0);
     return PIT_PATCH_OK;
-}
-
-pit_patch_result pit_patcher_run(const char *input_path, const char *output_path,
-                                 int apply_plan, pit_patch_log_fn log,
-                                 void *ctx, pit_patch_info *info)
-{
-    /* A NULL profile selects the built-in plan, so this stays the shipped path. */
-    return pit_patcher_run_ex(input_path, output_path, apply_plan, NULL, log, ctx,
-                              info);
 }

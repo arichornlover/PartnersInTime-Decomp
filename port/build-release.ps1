@@ -4,7 +4,7 @@ Builds the distributable Windows patcher and packages it as a ZIP.
 
 .DESCRIPTION
 Produces a release ZIP containing pit_launcher.exe, the headless pit_patch.exe,
-a rendered preview of the launcher and a README.
+a rendered preview of the launcher, a mods/ folder and a README.
 
 The build goes through CMake, which is the same path CI uses, so a ZIP built
 here is built the same way a CI artifact is. CMake fetches and statically links
@@ -105,6 +105,10 @@ Copy-Item $launcher $stage
 Copy-Item $headless $stage
 Copy-Item (Join-Path $portRoot 'README.md') $stage
 Copy-Item $shot (Join-Path $stage 'ui-preview.bmp')
+# Ship the bundled mods so a fresh extract already has hard_mode beside the
+# launcher. The launcher also seeds this folder itself on first run, so the two
+# are redundant on purpose: editing a profile.json in the ZIP still takes effect.
+Copy-Item (Join-Path $portRoot 'mods') $stage -Recurse -Force
 
 # Refuse to package anything that could carry game data. The check is on the
 # staged tree, so it also catches a stray file added by a later step.
