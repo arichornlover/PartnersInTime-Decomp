@@ -231,6 +231,30 @@ if ($SkipUi) {
             } finally { Pop-Location }
         }
     }
+
+    # The Dear ImGui launcher is a separate binary. Its headless mode renders
+    # each tab and writes a BMP, which check_launcher.py validates for size and
+    # the theme's signature colours.
+    $launcherExe = Join-Path $portRoot 'build\pit_launcher.exe'
+    if ($onWindows -and (Test-Path $launcherExe)) {
+        $frameDir = Join-Path $portRoot 'build\ui-frames'
+        New-Item -ItemType Directory -Force $frameDir | Out-Null
+        foreach ($entry in @{ home = 0; mods = 1; settings = 2; about = 3 }.GetEnumerator()) {
+            $tabName = $entry.Key
+            $tabIndex = $entry.Value
+            Invoke-Check "launcher frame: $tabName tab" {
+                & $launcherExe --hidden --frames 3 --tab $tabIndex --screenshot (Join-Path $frameDir "launcher-$tabName.bmp")
+                if ($LASTEXITCODE -ne 0) { throw "pit_launcher exited $LASTEXITCODE" }
+                Push-Location $portRoot
+                try {
+                    Invoke-Python @('tools\check_launcher.py', "build\ui-frames\launcher-$tabName.bmp")
+                } finally { Pop-Location }
+            }
+        }
+    } else {
+        Write-Host ''
+        Write-Host '--- launcher frame check SKIPPED (build/pit_launcher.exe not built)'
+    }
 }
 
 Write-Host ''

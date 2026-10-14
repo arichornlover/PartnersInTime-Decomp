@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.21)
-project(PartnersInTimePort C)
+project(PartnersInTimePort C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -23,6 +25,41 @@ FetchContent_Declare(SDL2
   GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(SDL2)
+
+# Dear ImGui. The repository root has no CMakeLists, so FetchContent only
+# downloads it and the target below lists the sources explicitly.
+set(IMGUI_TAG v1.90.9)
+FetchContent_Declare(imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG ${IMGUI_TAG}
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
+add_library(imgui STATIC
+  ${imgui_SOURCE_DIR}/imgui.cpp
+  ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp
+  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC
+  ${imgui_SOURCE_DIR}
+  ${imgui_SOURCE_DIR}/backends
+)
+if(TARGET SDL2::SDL2-static)
+  target_link_libraries(imgui PUBLIC SDL2::SDL2-static)
+else()
+  target_link_libraries(imgui PUBLIC SDL2::SDL2)
+endif()
+
+if(WIN32)
+  target_link_libraries(imgui PUBLIC opengl32)
+else()
+  find_package(OpenGL REQUIRED)
+  target_link_libraries(imgui PUBLIC OpenGL::GL)
+endif()
 
 add_library(pit_core STATIC
   src/core/pit_archive.c
@@ -68,9 +105,25 @@ add_executable(pit_patcher
 target_link_libraries(pit_patcher PRIVATE pit_platform_sdl2 pit_core)
 target_include_directories(pit_patcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+# Launcher. A C++ Dear ImGui front end over the same pit_core the headless
+# driver and the SDL patcher use, so every front end applies the same plan.
+add_executable(pit_launcher
+  src/ui/launcher_main.cpp
+  src/ui/launcher_theme.cpp
+  src/ui/launcher_config.cpp
+)
+target_link_libraries(pit_launcher PRIVATE pit_core imgui)
+target_include_directories(pit_launcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+find_package(Threads REQUIRED)
+target_link_libraries(pit_launcher PRIVATE Threads::Threads)
+if(WIN32)
+  # GetOpenFileName for the browse buttons and ShellExecute for "open folder".
+  target_link_libraries(pit_launcher PRIVATE comdlg32 shell32 ole32)
+endif()
+
 if(WIN32)
   # GetOpenFileName for the Browse buttons.
   target_link_libraries(pit_patcher PRIVATE comdlg32)
 endif()
 
-install(TARGETS pit pit_patch pit_patcher RUNTIME DESTINATION bin)
+install(TARGETS pit pit_patch pit_patcher pit_launcher RUNTIME DESTINATION bin)
