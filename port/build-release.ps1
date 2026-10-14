@@ -111,10 +111,17 @@ Copy-Item $shot (Join-Path $stage 'ui-preview.bmp')
 Copy-Item (Join-Path $portRoot 'mods') $stage -Recurse -Force
 
 # Refuse to package anything that could carry game data. The check is on the
-# staged tree, so it also catches a stray file added by a later step.
+# staged tree, so it also catches a stray file added by a later step. A JSON
+# file directly under the shipped mods\ tree is a mod profile (public constants
+# only), so it is allowed; every other game-data extension, baserom and
+# keystore is still rejected everywhere, including inside mods\.
+$modsRoot = (Join-Path $stage 'mods') + [System.IO.Path]::DirectorySeparatorChar
 $forbidden = Get-ChildItem $stage -Recurse -File | Where-Object {
-    $_.Extension -in @('.nds', '.bin', '.rom', '.gba', '.json') -or
-    $_.Name -match 'baserom|enemies\.json|\.keystore$'
+    $isShippedModProfile = $_.Extension -eq '.json' -and
+        $_.FullName.StartsWith($modsRoot, [System.StringComparison]::OrdinalIgnoreCase)
+    -not $isShippedModProfile -and (
+        $_.Extension -in @('.nds', '.bin', '.rom', '.gba', '.json') -or
+        $_.Name -match 'baserom|enemies\.json|\.keystore$')
 }
 if ($forbidden) {
     throw "refusing to package: $($forbidden.Name -join ', ')"
