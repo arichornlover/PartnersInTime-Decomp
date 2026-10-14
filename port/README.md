@@ -142,7 +142,7 @@ committed here.
 
 ```
 src/core/            patch pipeline, ROM/FNT reader, SHA-1, PNG writer, data export
-src/ui/              Dear ImGui launcher (SDL2 + OpenGL3)
+src/ui/              Dear ImGui launcher (SDL2 + SDL_Renderer)
 src/platform/sdl2/   SDL2 platform layer for the launcher and runtime
 tools/               plan generator, font generator and verification scripts
 android/             pure-Java patcher, same generated plan

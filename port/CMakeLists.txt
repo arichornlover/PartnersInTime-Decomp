@@ -42,7 +42,7 @@ add_library(imgui STATIC
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
   ${imgui_SOURCE_DIR}/imgui_widgets.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
-  ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer2.cpp
 )
 target_include_directories(imgui PUBLIC
   ${imgui_SOURCE_DIR}
@@ -52,13 +52,6 @@ if(TARGET SDL2::SDL2-static)
   target_link_libraries(imgui PUBLIC SDL2::SDL2-static)
 else()
   target_link_libraries(imgui PUBLIC SDL2::SDL2)
-endif()
-
-if(WIN32)
-  target_link_libraries(imgui PUBLIC opengl32)
-else()
-  find_package(OpenGL REQUIRED)
-  target_link_libraries(imgui PUBLIC OpenGL::GL)
 endif()
 
 add_library(pit_core STATIC

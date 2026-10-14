@@ -33,8 +33,8 @@
 #endif
 
 #include <imgui.h>
-#include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
+#include <imgui_impl_sdlrenderer2.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -59,19 +59,6 @@ extern "C" {
 #include <string>
 #include <thread>
 #include <vector>
-
-/* OpenGL 1.1 entry points we use directly. Declared here so this file needs no
- * GL header; the ImGui OpenGL3 backend carries its own loader for everything
- * else. */
-extern "C" {
-void glViewport(int x, int y, int w, int h);
-void glClearColor(float r, float g, float b, float a);
-void glClear(unsigned int mask);
-}
-
-static const unsigned int GL_COLOR_BUFFER_BIT_ = 0x00004000u;
-static const unsigned int GL_RGBA_ = 0x1908u;
-static const unsigned int GL_UNSIGNED_BYTE_ = 0x1401u;
 
 static const char *k_version = "PiT Launcher 0.1";
 
@@ -939,7 +926,7 @@ static void ViewAbout(App *app)
 
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
     ImGui::SeparatorText("Built with");
-    ImGui::BulletText("Dear ImGui  -  SDL2  -  OpenGL3");
+        ImGui::BulletText("Dear ImGui  -  SDL2  -  SDL_Renderer");
     CardEnd();
 }
 
@@ -982,27 +969,21 @@ static void DrawUI(App *app)
 
 /* --------------------------------------------------------------- screenshot */
 
-#ifdef _WIN32
-typedef void (*PFNGLREADPIXELS)(int, int, int, int, unsigned int, unsigned int,
-                                void *);
-
-static unsigned char *ReadPixels(int w, int h)
+static unsigned char *ReadPixels(SDL_Renderer *renderer, int w, int h)
 {
-    PFNGLREADPIXELS fn =
-        (PFNGLREADPIXELS)SDL_GL_GetProcAddress("glReadPixels");
-    if (!fn) {
-        return nullptr;
-    }
-    unsigned char *raw =
-        (unsigned char *)std::malloc((size_t)w * h * 4);
+    unsigned char *raw = (unsigned char *)std::malloc((size_t)w * h * 4);
     if (!raw) {
         return nullptr;
     }
-    fn(0, 0, w, h, GL_RGBA_, GL_UNSIGNED_BYTE_, raw);
+    if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, raw,
+                             w * 4) != 0) {
+        std::free(raw);
+        return nullptr;
+    }
     return raw;
 }
 
-static bool WriteBMP(const char *path, int w, int h, const unsigned char *rgba)
+static bool WriteBMP(const char *path, int w, int h, const unsigned char *argb)
 {
     int row = (w * 3 + 3) & ~3;
     unsigned int img = (unsigned int)(row * h);
@@ -1026,21 +1007,22 @@ static bool WriteBMP(const char *path, int w, int h, const unsigned char *rgba)
     }
     std::fwrite(hdr, 1, sizeof(hdr), f);
     std::vector<unsigned char> line((size_t)row, 0);
-    /* glReadPixels returns rows bottom-to-top, which is BMP's native order, so
-     * write them in order and the file opens the right way up. */
+    /* SDL_RenderReadPixels returns rows top-to-bottom; BMP is bottom-up with a
+     * positive height, so walk the source rows in reverse. ARGB8888 is
+     * 0xAARRGGBB little-endian, i.e. B, G, R, A in memory: BMP's channel
+     * order. */
     for (int y = 0; y < h; y++) {
+        const unsigned char *src = argb + (size_t)(h - 1 - y) * w * 4;
         for (int x = 0; x < w; x++) {
-            const unsigned char *p = rgba + ((size_t)y * w + x) * 4;
-            line[(size_t)x * 3 + 0] = p[2];
-            line[(size_t)x * 3 + 1] = p[1];
-            line[(size_t)x * 3 + 2] = p[0];
+            line[(size_t)x * 3 + 0] = src[(size_t)x * 4 + 0];
+            line[(size_t)x * 3 + 1] = src[(size_t)x * 4 + 1];
+            line[(size_t)x * 3 + 2] = src[(size_t)x * 4 + 2];
         }
         std::fwrite(line.data(), 1, (size_t)row, f);
     }
     std::fclose(f);
     return true;
 }
-#endif
 
 /* --------------------------------------------------------------- main */
 
@@ -1124,17 +1106,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    const char *glsl_version = "#version 130";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-
-    Uint32 win_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-                       SDL_WINDOW_ALLOW_HIGHDPI;
+    Uint32 win_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
     if (hidden) {
         win_flags |= SDL_WINDOW_HIDDEN;
     }
@@ -1149,15 +1121,22 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    SDL_GLContext gl = SDL_GL_CreateContext(window);
-    if (!gl) {
-        std::fprintf(stderr, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
+    /* SDL_Renderer keeps the launcher off any specific GL version: the
+     * accelerated path is used when a driver is present and the software
+     * renderer otherwise, which is what lets the headless frame checks run on a
+     * GPU-less CI runner. */
+    SDL_Renderer *renderer =
+        SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    if (!renderer) {
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+    }
+    if (!renderer) {
+        std::fprintf(stderr, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
-    SDL_GL_MakeCurrent(window, gl);
-    SDL_GL_SetSwapInterval(app.cfg.vsync ? 1 : 0);
+    SDL_RenderSetVSync(renderer, app.cfg.vsync ? 1 : 0);
 
 #ifdef _WIN32
     {
@@ -1197,8 +1176,8 @@ int main(int argc, char **argv)
 
     pit::ui::ApplyStyle();
 
-    ImGui_ImplSDL2_InitForOpenGL(window, gl);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer2_Init(renderer);
 
     bool running = true;
     int frames = 0;
@@ -1222,7 +1201,7 @@ int main(int argc, char **argv)
             FinishRun(&app);
         }
 
-        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
@@ -1231,25 +1210,22 @@ int main(int argc, char **argv)
         ImGui::Render();
 
         int dw = 0, dh = 0;
-        SDL_GL_GetDrawableSize(window, &dw, &dh);
-        glViewport(0, 0, dw, dh);
-        glClearColor(0.02f, 0.03f, 0.06f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT_);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        SDL_GetRendererOutputSize(renderer, &dw, &dh);
+        SDL_SetRenderDrawColor(renderer, 5, 8, 15, 255);
+        SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
 
-#ifdef _WIN32
         if (!screenshot.empty() && frame_limit > 0 && frames + 1 >= frame_limit) {
-            unsigned char *rgba = ReadPixels(dw, dh);
-            if (rgba) {
-                shot.assign(rgba, rgba + (size_t)dw * dh * 4);
+            unsigned char *argb = ReadPixels(renderer, dw, dh);
+            if (argb) {
+                shot.assign(argb, argb + (size_t)dw * dh * 4);
                 shot_w = dw;
                 shot_h = dh;
-                std::free(rgba);
+                std::free(argb);
             }
         }
-#endif
 
-        SDL_GL_SwapWindow(window);
+        SDL_RenderPresent(renderer);
 
         frames++;
         if (frame_limit > 0 && frames >= frame_limit) {
@@ -1257,24 +1233,21 @@ int main(int argc, char **argv)
         }
     }
 
-#ifdef _WIN32
     if (!screenshot.empty() && !shot.empty()) {
         if (WriteBMP(screenshot.c_str(), shot_w, shot_h, shot.data())) {
             std::printf("wrote %s (%dx%d)\n", screenshot.c_str(), shot_w, shot_h);
         }
     }
-#endif
-    (void)shot;
 
     if (app.worker_running) {
         app.worker.join();
     }
 
-    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
-    SDL_GL_DeleteContext(gl);
+    SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
