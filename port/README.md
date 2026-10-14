@@ -13,22 +13,6 @@ downloaded, shipped or stored in this tool or its APK.
 
 ## Hard Mode is optional
 
-The **Hard Mode** mod is a data edit in the **MODS** tab, **off by default**.
-Turn it on if you want enemy HP, power, defense and speed raised, along with
-experience and coin drops:
-
-| Field | Scale |
-|---|---|
-| Enemy HP | x11/10 |
-| Enemy power | x2 |
-| Enemy defense | x21/20 |
-| Enemy speed | x5/4 |
-| Experience | x7/4 |
-| Coins | x7/4 |
-
-With the mod **off**, the launcher does not edit the copy beyond repairing its
-## Hard Mode is optional
-
 The **MODS** tab lists the mods you can apply, **none by default**. The first two
 rows are always `NO MOD` and **Hard Mode**; any folder you drop into `mods\` is
 listed after them. Pick **Hard Mode** if you want enemy HP, power, defense and
@@ -82,20 +66,20 @@ An over-long `name`, `version` or `description` is truncated rather than
 refused: those are only ever shown on one clipped line, and the shipped Hard
 Mode description is longer than the buffer holds.
 
-The desktop launcher takes flags for the same list, which is handy for testing a
-profile without clicking through the UI:
+The headless driver `pit_patch.exe` takes flags for the same list, which is
+handy for checking a profile without opening the launcher:
 
 | Flag | Effect |
 |---|---|
-| `--mods off` / `--mods on` | select `NO MOD` or the built-in Hard Mode |
-| `--mod <id>` | select a profile by its declared `id`, preferring it over the built-in row |
-| `--mods-dir <dir>` | read profiles from `<dir>` instead of `mods\` |
-| `--list-mods` | print the profiles that would load, then exit |
-| `--in-place` | patch through one buffer instead of two, as the Android app must |
+| `--no-mods` | verify and copy with no mod applied |
+| `--mods-dir <dir>` | where profiles are discovered (default `mods`) |
+| `--mod <id>` | apply this profile instead of the built-in one |
+| `--list-mods` | print the catalog and exit |
+| `--ingest <dir>` | also export generated data (banner, NitroFS tree, SDAT probe, manifest) |
 
-`--in-place` is a testing aid, not something you normally need: it reproduces
-the memory behaviour of the Android app on a desktop JVM so both can be checked
-against each other.
+The Java desktop harness `PitSelfTest` adds `--in-place`, a testing aid that
+reproduces the Android app's single-buffer memory behaviour so both can be
+checked against each other.
 
 ## What you need
 
@@ -106,7 +90,7 @@ it is stored in this tool or its APK.
 
 | Platform | Artifact | How |
 |---|---|---|
-| Windows x64 | `pit_patcher.exe` | CMake, or `build-release.ps1` to package a ZIP |
+| Windows x64 | `pit_launcher.exe` | CMake, or `build-release.ps1` to package a ZIP |
 | Windows x64 | `pit_patch.exe` | headless driver, same pipeline |
 | Android | `pit-patcher-release.apk` | `android\build-apk.ps1` (Windows) or `android\build-apk.sh` (POSIX) |
 
@@ -114,7 +98,7 @@ Both are built by CI on every push, and the artifacts are attached to the run:
 
 | Workflow | Produces |
 |---|---|
-| `.github/workflows/windows.yml` | `PiT-Patcher-win64.zip`, plus the rendered UI frames |
+| `.github/workflows/windows.yml` | `PiT-Launcher-win64.zip`, plus the rendered UI frames |
 | `.github/workflows/android.yml` | `pit-patcher-release.apk`, or an unsigned APK when no signing secret is set |
 
 The Windows build needs CMake, Ninja, a C compiler and git; SDL2 is fetched and
@@ -130,18 +114,20 @@ which is ignored.
 
 ## Using it
 
-The launcher has three tabs — **ROM**, **MODS**, **ABOUT** — with mouse,
-touch and keyboard support.
+The launcher has four tabs — **HOME**, **MODS**, **SETTINGS** and **ABOUT** —
+driven by mouse, touch and the keyboard.
 
-1. Choose your EUR ROM.
+1. Choose your EUR ROM on **HOME** (or drop it onto the window).
 2. Choose an output file. The output must not be the source.
 3. Optionally open **MODS** and pick a mod.
-4. Press **INGEST**.
+4. Press **PREPARE ROM**.
 
-The app verifies the ROM size, SHA-1, title, game code and header CRC-16,
+The launcher verifies the ROM size, SHA-1, title, game code and header CRC-16,
 locates `BData/BDataMon.dat` through the NitroFS directory table, and — with a
 mod selected — scales the 98 stat records and recomputes the header CRC. It
-always works on a copy, so a failure never damages the source.
+always works on a copy, so a failure never damages the source. **SETTINGS**
+holds the theme, window and mods-folder options, remembered in
+`%APPDATA%\PiT-Launcher\config.ini`.
 
 ## Important
 
@@ -156,7 +142,8 @@ committed here.
 
 ```
 src/core/            patch pipeline, ROM/FNT reader, SHA-1, PNG writer, data export
-src/platform/sdl2/   graphical patcher
+src/ui/              Dear ImGui launcher (SDL2 + OpenGL3)
+src/platform/sdl2/   SDL2 platform layer for the launcher and runtime
 tools/               plan generator, font generator and verification scripts
 android/             pure-Java patcher, same generated plan
 mods/                mod profiles, one folder per mod
@@ -170,9 +157,10 @@ class both builds compile against, so the two cannot drift apart.
 form a mod author would write, so the shipped mod is read by the same parser as
 any other rather than being special-cased.
 
-The 5x7 font is generated by `tools/make_font.py` from the same text table and
-blitted as rectangles, so no font file is shipped and neither platform can
-substitute a system typeface.
+The 5x7 font is generated by `tools/make_font.py` from the shared text table;
+the Android patcher blits it as rectangles, so no font file is shipped there.
+The Windows launcher uses a Dear ImGui face instead (Segoe UI when present, the
+built-in face otherwise).
 
 ## Verification
 
@@ -183,12 +171,10 @@ Everything that does not need a cartridge:
 ```
 
 That covers the generated plan being current, the font's 95 glyphs and their
-byte-identical C and Java tables, the Windows and Android layout constants
-agreeing, the absence of ROM data in the tree, the Java patcher compiling
-warning-free under `-Xlint:all -Werror`, 1073 unit assertions, and five
-headlessly rendered launcher frames checked for layout, contrast and palette
-provenance (the ROM tab at rest and mid-patch, the MODS tab with no mod
-selected and with a mod selected, and the ABOUT tab).
+byte-identical C and Java tables, the absence of ROM data in the tree, the Java
+patcher compiling warning-free under `-Xlint:all -Werror`, 1081 unit assertions,
+and four headlessly rendered launcher frames checked for size and theme colours
+(the HOME, MODS, SETTINGS and ABOUT tabs).
 
 Checks that do need your own EUR ROM, and are therefore not part of CI:
 
@@ -201,17 +187,12 @@ The last one patches the same ROM with both the C and the Java build and
 compares the results byte for byte, with the hard-mode mod both on and off.
 Current result: **exact match** in both modes, 98 records and 588 fields.
 
-### One screen, two platforms
+### Render check
 
-The Windows and Android launchers draw the same 480x320 screen by hand, and
-nothing in either language makes them agree. `tools/check_ui_parity.py` reads
-both files and fails if any shared layout or palette constant differs — the
-identity enums (log levels, tab ids, button ids) included — so a change to one
-side's geometry cannot silently leave the other behind.
-
-`tools/check_ui.py` renders the Windows launcher headlessly to a PNG and checks
-the result objectively: element positions, no overlapping regions, text contrast
-in every state, and that every colour traces back to a ROM palette offset.
+`tools/check_launcher.py` loads a BMP the launcher wrote with `--screenshot` and
+asserts it is a 1200x760 24-bit image carrying the theme's signature colours, so
+a regressed theme or a frame that failed to draw fails the build rather than
+shipping.
 
 ## Legal
 

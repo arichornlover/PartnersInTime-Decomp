@@ -18,9 +18,9 @@ separately:
 [CmdletBinding()]
 param(
     [switch] $SkipJava,
-    # The launcher frame check needs a built pit_patcher.exe. It is skipped with a
-    # message rather than failing when the binary is absent, so a fresh checkout
-    # without a toolchain still runs the rest.
+    # The launcher frame check needs a built pit_launcher.exe. It is skipped with
+    # a message rather than failing when the binary is absent, so a fresh
+    # checkout without a toolchain still runs the rest.
     [switch] $SkipUi
 )
 
@@ -100,7 +100,7 @@ Invoke-Check 'font glyphs are valid and match the generated tables' {
     try { Invoke-Python @('tools/check_font.py') } finally { Pop-Location }
 }
 
-Invoke-Check 'Windows and Android layouts match' {
+Invoke-Check 'Android sources type-check against the SDK' {
     # Needs the Android SDK: aapt2's android.jar is the classpath, so the view's
     # Canvas calls are actually type-checked rather than merely read. Skipped
     # with a message when it is absent, so a developer without the SDK still gets
@@ -124,11 +124,6 @@ Invoke-Check 'Windows and Android layouts match' {
         Select-Object -ExpandProperty FullName
     & $javac -nowarn -encoding UTF-8 -classpath $androidJar -d $viewClasses @androidSources
     if ($LASTEXITCODE -ne 0) { throw "javac failed with exit code $LASTEXITCODE" }
-}
-
-Invoke-Check 'Windows and Android layout constants agree' {
-    Push-Location $portRoot
-    try { Invoke-Python @('tools/check_ui_parity.py') } finally { Pop-Location }
 }
 
 Invoke-Check 'no ROM or extracted game data in the tree' {
@@ -178,63 +173,8 @@ if ($SkipUi) {
     Write-Host ''
     Write-Host '--- Launcher frame check SKIPPED (-SkipUi)'
 } else {
-    $patcherExe = Join-Path $portRoot 'build\pit_patcher.exe'
-    if (-not (Test-Path $patcherExe)) {
-        Write-Host ''
-        Write-Host '--- Launcher frame check SKIPPED (build\pit_patcher.exe not built; run cmake --build build --target pit_patcher)'
-    } else {
-        $frameDir = Join-Path $portRoot 'build\ui-frames'
-        New-Item -ItemType Directory -Force $frameDir | Out-Null
-
-        # Five frames, one per screen state: the ROM tab at rest and mid-patch,
-        # the MODS tab with the mod off and on, and the ABOUT tab. All are drawn
-        # by the same render() the window uses, so these catch layout and
-        # legibility regressions without a display.
-        Invoke-Check 'launcher frame: ROM tab, idle' {
-            & $patcherExe --screenshot (Join-Path $frameDir 'idle.png') --tab PATCH
-            if ($LASTEXITCODE -ne 0) { throw "pit_patcher exited $LASTEXITCODE" }
-            Push-Location $portRoot
-            try {
-                Invoke-Python @('tools\check_ui.py', 'build\ui-frames\idle.png')
-            } finally { Pop-Location }
-        }
-        Invoke-Check 'launcher frame: ROM tab, mid-patch' {
-            & $patcherExe --screenshot (Join-Path $frameDir 'busy.png') --tab PATCH --simulate
-            if ($LASTEXITCODE -ne 0) { throw "pit_patcher exited $LASTEXITCODE" }
-            Push-Location $portRoot
-            try {
-                Invoke-Python @('tools\check_ui.py', 'build\ui-frames\busy.png', '--expect-half')
-            } finally { Pop-Location }
-        }
-        Invoke-Check 'launcher frame: MODS tab, mod off' {
-            & $patcherExe --screenshot (Join-Path $frameDir 'mods.png') --tab MODS --mods off
-            if ($LASTEXITCODE -ne 0) { throw "pit_patcher exited $LASTEXITCODE" }
-            Push-Location $portRoot
-            try {
-                Invoke-Python @('tools\check_ui.py', 'build\ui-frames\mods.png')
-            } finally { Pop-Location }
-        }
-        Invoke-Check 'launcher frame: MODS tab, mod on' {
-            & $patcherExe --screenshot (Join-Path $frameDir 'mods-on.png') --tab MODS --mods on
-            if ($LASTEXITCODE -ne 0) { throw "pit_patcher exited $LASTEXITCODE" }
-            Push-Location $portRoot
-            try {
-                Invoke-Python @('tools\check_ui.py', 'build\ui-frames\mods-on.png')
-            } finally { Pop-Location }
-        }
-        Invoke-Check 'launcher frame: ABOUT tab' {
-            & $patcherExe --screenshot (Join-Path $frameDir 'about.png') --tab ABOUT
-            if ($LASTEXITCODE -ne 0) { throw "pit_patcher exited $LASTEXITCODE" }
-            Push-Location $portRoot
-            try {
-                Invoke-Python @('tools\check_ui.py', 'build\ui-frames\about.png')
-            } finally { Pop-Location }
-        }
-    }
-
-    # The Dear ImGui launcher is a separate binary. Its headless mode renders
-    # each tab and writes a BMP, which check_launcher.py validates for size and
-    # the theme's signature colours.
+    # The Dear ImGui launcher runs headlessly: each tab renders to a BMP, which
+    # check_launcher.py validates for size and the theme's signature colours.
     $launcherExe = Join-Path $portRoot 'build\pit_launcher.exe'
     if ($onWindows -and (Test-Path $launcherExe)) {
         $frameDir = Join-Path $portRoot 'build\ui-frames'

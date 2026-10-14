@@ -65,8 +65,8 @@ jobs:
         with:
           name: ui-frames
           path: |
-            port/build/ui-frames/*.png
-            port/build/release-ui.png
+            port/build/ui-frames/*.bmp
+            port/build/release-ui.bmp
           if-no-files-found: ignore
 
       - name: Package
@@ -76,6 +76,6 @@ jobs:
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: PiT-Patcher-win64
-          path: port/build/PiT-Patcher-win64.zip
+          name: PiT-Launcher-win64
+          path: port/build/PiT-Launcher-win64.zip
           if-no-files-found: error

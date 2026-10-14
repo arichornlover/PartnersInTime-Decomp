@@ -96,17 +96,8 @@ endif()
 add_executable(pit src/main.c)
 target_link_libraries(pit PRIVATE pit_platform_sdl2)
 
-# Graphical patcher. Shares pit_core with the headless driver, so both apply the
-# same generated plan and cannot drift apart.
-add_executable(pit_patcher
-  src/patcher_ui_main.c
-  src/platform/sdl2/pit_patcher_ui.c
-)
-target_link_libraries(pit_patcher PRIVATE pit_platform_sdl2 pit_core)
-target_include_directories(pit_patcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
 # Launcher. A C++ Dear ImGui front end over the same pit_core the headless
-# driver and the SDL patcher use, so every front end applies the same plan.
+# driver uses, so every front end applies the same plan.
 add_executable(pit_launcher
   src/ui/launcher_main.cpp
   src/ui/launcher_theme.cpp
@@ -121,9 +112,4 @@ if(WIN32)
   target_link_libraries(pit_launcher PRIVATE comdlg32 shell32 ole32)
 endif()
 
-if(WIN32)
-  # GetOpenFileName for the Browse buttons.
-  target_link_libraries(pit_patcher PRIVATE comdlg32)
-endif()
-
-install(TARGETS pit pit_patch pit_patcher pit_launcher RUNTIME DESTINATION bin)
+install(TARGETS pit pit_patch pit_launcher RUNTIME DESTINATION bin)

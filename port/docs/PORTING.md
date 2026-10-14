@@ -69,10 +69,11 @@ Done:
 - Presentation shell: dual 256x192 framebuffers, three layouts, Dynamic Screen
   focus handling, SDL2 frontend.
 - Hard Mode data mod: reproducible multiplier profile and generator.
-- **Standalone patcher** (`src/core/pit_patcher.c`, two frontends). Verifies the
-  cartridge, locates the stat table through the NitroFS reader, applies the plan
-  and recomputes the header CRC. Built and packaged for Windows and Android;
-  see [The patcher](#the-patcher).
+- **Standalone patcher** (`src/core/pit_patcher.c`, three frontends: the Dear
+  ImGui launcher, the headless `pit_patch` driver and the Android app). Verifies
+  the cartridge, locates the stat table through the NitroFS reader, applies the
+  plan and recomputes the header CRC. Built and packaged for Windows and Android;
+  see [The launcher](#the-launcher).
 
 Not done:
 
@@ -121,7 +122,8 @@ the decompilation needs — the cartridge banner as a PNG, the NitroFS file tree
 a probe of `sound_data.sdat`, and a manifest — next to the copy. The source ROM
 is never modified.
 
-The launcher has three tabs — **ROM**, **MODS**, **ABOUT** — and **MODS** lists
+The launcher has four tabs — **HOME**, **MODS**, **SETTINGS** and **ABOUT** —
+and **MODS** lists
 the mods that may be applied, **none by default**. Its first two rows are always
 `NO MOD` and the built-in Hard Mode plan; every folder under `mods/` holding a
 loadable `profile.json` is listed after them. With no mod selected, the launcher
@@ -131,7 +133,7 @@ scaled and the output carries that mod's own suffix, `.hardmode.nds` for the
 built-in plan. The prepared copies are named differently so they cannot be
 mistaken for each other.
 
-The two launchers read profiles under the same rules, because the loader decides
+The C core and the Android app read profiles under the same rules, because the loader decides
 what a profile does to the ROM. An `id` over 32 characters is refused, since it
 identifies the profile for `--mod`, the list and the output name; one field may
 appear only once, since a repeated field would scale twice and make the written
@@ -194,14 +196,15 @@ Current results, against the supported EUR cartridge:
 | C output vs. Java output, mod off (prepare-only) | byte-identical |
 | Profile loading, seven fixtures incl. limits | both readers load or refuse each one identically |
 | Java unit tests | 1073 checks, 0 failed |
-| UI layout | rendered headlessly to PNG and text on every Windows build |
+| Java unit tests | 1081 checks, 0 failed |
+| Launcher frames | each tab rendered headlessly to BMP and checked on every Windows build |
 
-The last one matters more than it looks. `pit_patcher.exe --screenshot` draws
-through the same `render()` the window uses and `--dump-ascii` serialises the
-canvas to text, so a layout that cannot be drawn fails the build instead of
-shipping. The UI checks cover all three tabs — the ROM tab at rest and
-mid-patch, the MODS tab with no mod selected and with a mod selected, and the ABOUT tab — so a
-layout change to one screen cannot silently regress another.
+The last one matters more than it looks. `pit_launcher.exe --hidden --frames N
+--screenshot` draws through the same ImGui frame the window uses, and
+`tools/check_launcher.py` asserts the BMP is the expected size and carries the
+theme's signature colours, so a frame that cannot be drawn or a regressed theme
+fails the build instead of shipping. All four tabs — HOME, MODS, SETTINGS and
+ABOUT — are rendered, so a change to one cannot silently regress another.
 
 The prepared or patched ROM is **not** expected to boot. Nothing in this project
 can run the game yet, and the patcher demonstrates a verified patch pipeline,
@@ -211,7 +214,7 @@ not a playable build.
 
 The Android app is plain Java against the platform APIs: no SDL, no NDK, no
 Gradle. `Patcher.java`, `NitroFs.java` and `Sha1.java` have no `android.*`
-dependency at all, which is what makes them testable on a desktop JVM — 1073
+dependency at all, which is what makes them testable on a desktop JVM — 1081
 class-path checks run without a device. `MainActivity` adds Storage Access
 Framework file access and a worker thread; the app declares no storage
 permission, so it only ever touches the two documents the user picked.
@@ -251,11 +254,11 @@ Both behaviours live in `MainActivity`, apart from `readCartridge`. `Patcher.jav
 `NitroFs.java`, `ModProfile.java` and `Sha1.java` stay free of `android.*`
 imports, which is why the patcher itself remains testable on a desktop JVM.
 
-`PatcherView` draws the 480x320 interface by hand: the same three-tab design the
-C build renders, with text blitted from the same generated 8x8 font the C build
-uses. `tools/check_ui_parity.py` makes the two agree by failing if any shared
-layout or palette constant differs. No font files and no bitmap assets ship in
-the repository, and the launcher icon is vector XML.
+`PatcherView` draws the 480x320 Android interface by hand, with text blitted
+from the generated 5x7 font shared with the C core; it is a separate,
+phone-oriented layout and does not track the desktop launcher's geometry. No
+font files and no bitmap assets ship in the repository, and the launcher icon is
+vector XML.
 
 Built with `aapt2` → `javac` → `d8` → `zipalign` → `apksigner` directly.
 Signing is v1/v2 only, because the v3 block carries a SHA-256 signature that

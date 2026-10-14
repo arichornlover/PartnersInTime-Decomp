@@ -23,12 +23,10 @@ import java.util.List;
  * identical and avoids shipping a font file, and it means the UI needs no
  * resources beyond its own string literals.
  *
- * <p>The layout, palette and drawing order mirror
- * {@code port/src/platform/sdl2/pit_patcher_ui.c} one to one. Every colour is a
- * value the C renderer also uses, taken from the real EUR ROM's 15-bit BGR555
- * palettes, so a frame here and a frame there are the same picture. When one
- * side's layout changes, the other has to change with it; the constants below are
- * named after the C macros deliberately.
+ * <p>The palette is taken from the real EUR ROM's 15-bit BGR555 values, so a
+ * frame here keeps the game's colours. The Windows build is now a Dear ImGui
+ * launcher with its own layout, so this phone UI no longer mirrors it; the
+ * constants below describe the Android layout only.
  *
  * <p>The view is otherwise inert. It reports taps through {@link Callback} and
  * lets the activity own all state, so the same layout can be exercised in a
@@ -42,7 +40,7 @@ import java.util.List;
  */
 public final class PatcherView extends View {
 
-    /** Design-space size, matching UI_W/UI_H in the C renderer. */
+    /** Design-space size of the phone layout. */
     public static final int UI_W = 480;
     public static final int UI_H = 320;
 

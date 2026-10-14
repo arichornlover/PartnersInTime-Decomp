@@ -3,7 +3,7 @@
 Builds the distributable Windows patcher and packages it as a ZIP.
 
 .DESCRIPTION
-Produces a release ZIP containing pit_patcher.exe, the headless pit_patch.exe,
+Produces a release ZIP containing pit_launcher.exe, the headless pit_patch.exe,
 a rendered preview of the launcher and a README.
 
 The build goes through CMake, which is the same path CI uses, so a ZIP built
@@ -82,16 +82,16 @@ Invoke-Step 'configure' $cmake (@('-S', $portRoot, '-B', $BuildDir) +
     $generatorArgs + @('-DCMAKE_BUILD_TYPE=RelWithDebInfo'))
 Invoke-Step 'build' $cmake (@('--build', $BuildDir, '--config', 'RelWithDebInfo'))
 
-$patcher = Join-Path $BuildDir 'pit_patcher.exe'
+$launcher = Join-Path $BuildDir 'pit_launcher.exe'
 $headless = Join-Path $BuildDir 'pit_patch.exe'
-foreach ($binary in @($patcher, $headless)) {
+foreach ($binary in @($launcher, $headless)) {
     if (-not (Test-Path $binary)) { throw "build produced no $binary" }
 }
 
-# The UI is rendered headlessly and serialised to PNG. A layout that cannot be
+# The launcher renders its home tab headlessly to a BMP. A layout that cannot be
 # drawn must fail the release, not ship.
-$shot = Join-Path $BuildDir 'release-ui.png'
-Invoke-Step 'UI render check' $patcher @('--screenshot', $shot, '--simulate')
+$shot = Join-Path $BuildDir 'release-ui.bmp'
+Invoke-Step 'UI render check' $launcher @('--hidden', '--frames', '3', '--screenshot', $shot)
 if (-not (Test-Path $shot)) { throw "UI render produced no image at $shot" }
 Write-Host "    wrote $shot"
 
@@ -99,12 +99,12 @@ Write-Host "    wrote $shot"
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-$stage = Join-Path $OutDir 'PiT-Patcher'
+$stage = Join-Path $OutDir 'PiT-Launcher'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
-Copy-Item $patcher $stage
+Copy-Item $launcher $stage
 Copy-Item $headless $stage
 Copy-Item (Join-Path $portRoot 'README.md') $stage
-Copy-Item $shot (Join-Path $stage 'ui-preview.png')
+Copy-Item $shot (Join-Path $stage 'ui-preview.bmp')
 
 # Refuse to package anything that could carry game data. The check is on the
 # staged tree, so it also catches a stray file added by a later step.
@@ -116,7 +116,7 @@ if ($forbidden) {
     throw "refusing to package: $($forbidden.Name -join ', ')"
 }
 
-$zip = Join-Path $portRoot 'build\PiT-Patcher-win64.zip'
+$zip = Join-Path $portRoot 'build\PiT-Launcher-win64.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip,
