@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Background layer of the adaptive launcher icon (API 26+). The foreground art
+  lives in drawable/ic_launcher_foreground.xml; the raster mipmaps are the
+  legacy icon for older devices. tools/gen_icon.ps1 draws the equivalent badge
+  for Windows. This colour matches the badge's navy.
+-->
+<resources>
+    <color name="ic_launcher_background">#12183A</color>
+</resources>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy launcher icon for API below 26, drawn as a vector so the repository
+  ships no bitmap assets. It carries the full badge (background plus art); the
+  API 26+ adaptive icon in mipmap-anydpi-v26/ layers the same art over a colour.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Badge background. -->
+    <path
+        android:fillColor="#12183A"
+        android:pathData="M0,0 h108 v108 h-108 z" />
+
+    <!-- Clock ring. -->
+    <path
+        android:strokeColor="#F2B233"
+        android:strokeWidth="4"
+        android:fillColor="#00000000"
+        android:pathData="M24,54 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0" />
+
+    <!-- Tick marks. -->
+    <path
+        android:strokeColor="#FFD766"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,32 L54,24 M54,76 L54,84 M32,54 L24,54 M76,54 L84,54" />
+
+    <!-- Four-point cobalt star. -->
+    <path
+        android:fillColor="#3D7BE8"
+        android:strokeColor="#F2B233"
+        android:strokeWidth="2"
+        android:strokeLineJoin="round"
+        android:pathData="M54,30 L59.657,48.343 L78,54 L59.657,59.657 L54,78 L48.343,59.657 L30,54 L48.343,48.343 Z" />
+
+    <!-- Golden core. -->
+    <path
+        android:fillColor="#FFD766"
+        android:pathData="M49,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+</vector>

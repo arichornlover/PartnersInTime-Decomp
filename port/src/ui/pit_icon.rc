@@ -1,0 +1,7 @@
+/*
+ * Windows resource script shared by the launcher and the headless patcher.
+ * tools/gen_icon.ps1 generates the pit_launcher.ico beside this file and CMake
+ * adds this directory to the resource compiler's include path. The numeric id
+ * avoids including windows.h, which windres would otherwise have to locate.
+ */
+1 ICON "pit_launcher.ico"

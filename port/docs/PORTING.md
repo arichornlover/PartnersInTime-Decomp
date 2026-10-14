@@ -260,8 +260,11 @@ imports, which is why the patcher itself remains testable on a desktop JVM.
 `PatcherView` draws the 480x320 Android interface by hand, with text blitted
 from the generated 5x7 font shared with the C core; it is a separate,
 phone-oriented layout and does not track the desktop launcher's geometry. No
-font files and no bitmap assets ship in the repository, and the launcher icon is
-vector XML.
+font files and no bitmap assets ship in the repository: the launcher icon is
+vector XML (`mipmap-anydpi/ic_launcher.xml` for API below 26 and an adaptive
+icon in `mipmap-anydpi-v26/` for API 26+). On Windows the same badge is drawn by
+`tools/gen_icon.ps1` into `src/ui/pit_launcher.ico`, which `src/ui/pit_icon.rc`
+embeds into `pit_launcher.exe` and `pit_patch.exe`.
 
 Built with `aapt2` → `javac` → `d8` → `zipalign` → `apksigner` directly.
 Signing is v1/v2 only, because the v3 block carries a SHA-256 signature that

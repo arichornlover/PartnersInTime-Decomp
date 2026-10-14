@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.21)
 project(PartnersInTimePort C CXX)
 
+# Windows executables embed the launcher icon through a resource script. RC is
+# only meaningful there; other platforms get an empty variable below.
+if(WIN32)
+  enable_language(RC)
+  set(PIT_RES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/ui)
+  set(PIT_RC src/ui/pit_icon.rc)
+  set_source_files_properties(${PIT_RC} PROPERTIES COMPILE_OPTIONS "-I${PIT_RES_DIR}")
+else()
+  set(PIT_RC)
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -71,7 +82,7 @@ target_include_directories(pit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Headless driver: proves the plan still produces the expected bytes without
 # needing a window, so the packaging script and the round-trip test can use it.
-add_executable(pit_patch src/patcher_main.c)
+add_executable(pit_patch src/patcher_main.c ${PIT_RC})
 target_link_libraries(pit_patch PRIVATE pit_core)
 
 add_library(pit_platform_sdl2 STATIC
@@ -95,6 +106,7 @@ add_executable(pit_launcher
   src/ui/launcher_main.cpp
   src/ui/launcher_theme.cpp
   src/ui/launcher_config.cpp
+  ${PIT_RC}
 )
 target_link_libraries(pit_launcher PRIVATE pit_core imgui)
 target_include_directories(pit_launcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
